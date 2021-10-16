@@ -1,3 +1,4 @@
+# Author Loik Andrey 7034@balancedv.ru
 # TODO
 #  Часть 1
 #  1. Создать отдельный файл программы для чтения файлов эксель. Передавать туда маску наименования файла, который требуется прочитать.
@@ -12,83 +13,69 @@
 
 import pandas as pd
 import os
+
 # import readfile
 
 FOLDER = 'Установка МО ответственным'
 salesName = 'продажи'
 minStockName = 'МО'
+
+
 # sales = readxls(FOLDER, 'Продажи')
 
-def search_file( name ):
+def search_file(name):
     """
-    Поиск всех файла в наименовании которых содержится name
+    :param name: Поиск всех файлов, в наименовании которых, содержится name
     :return: filelist список с наименованиями фалов
     """
     filelist = []
     for item in os.listdir(FOLDER):  # для каждого файла в папке FOLDER
-        if name in item and item.endswith( '.xlsx' ):
-            filelist.append ( FOLDER + "/" + item )
+        if name in item and item.endswith('.xlsx'):
+            filelist.append(FOLDER + "/" + item)
         else:
             pass
     return filelist
 
-def read_xlsx( file_list ):
+
+def read_xlsx(file_list):
     """
-    Загружаем в DataFrame файлы из file_list
-    :param file_list:
-    :return: df Дата фрэйм с данными из файлов
+    :param file_list: Загружаем в DataFrame файлы из file_list
+    :return: df_result Дата фрэйм с данными из файлов
     """
-    '''
-    df = [pd.read_excel(filename, sheet_name='TDSheet', header=0, usecols="A:G",
-                   skipfooter=1, engine='openpyxl') for filename in file_list]
-    '''
-    df = pd.concat([pd.read_excel(filename, sheet_name='TDSheet', header=0, usecols="A:M",
-                                  skipfooter=1, engine='openpyxl') for filename in file_list], ignore_index=True)
 
-    dfHeader = df.iloc[:15, :1]
-    mask = dfHeader == 'Номенклатура.Код'
-    print (mask)
-    print ( dfHeader[mask].any() )
+    df_result = None
+    for filename in file_list:
+        print(filename)
+        df = pd.read_excel(filename, sheet_name='TDSheet', header=0, usecols="A:I",
+                           skipfooter=1, engine='openpyxl')
+        df_search_header = df.iloc[:15, :1]
+        mask = df_search_header.replace('.*Номенклатура.*', True, regex=True).eq(True)
+        f = df_search_header[mask].dropna(axis=0,
+                                          how='all').index.values  # Удаление пустых колонок, если axis=0, то строк
+        df.columns = df.iloc[int(f)]
+        df = df.iloc[int(f) + 2:, :]
+        df = df.dropna(axis=1, how='all')  # Убрали пустые колонки
+        df.set_index(['Номенклатура.Код', 'Номенклатура'], inplace=True)
+        print(df.iloc[:15, :2])
 
-    # print ( mask.loc[lambda x: x == True].index )
+        df_result = pd.concat([df_result, df], axis=1, ignore_index=False, levels=['Номенклатура.Код'])
 
-
-    # print ( dfHeader.index[dfHeader == 'Номенклатура.Код'].tolist() )
-
-
-    '''
-    i = 0
-    for col in dfHeader:
-        for row in dfHeader[col]:
-            print ( row )
-            # if 'Номенклатура' in row:
-            #    print ( i, row )
-    '''
-    '''
-    df = pd.concat([pd.read_excel(filename, sheet_name='TDSheet', header=9, usecols="A:M",
-                                          skipfooter=1, engine='openpyxl') for filename in file_list], ignore_index=True)
-    df = df.dropna(axis=1, how='all')  # Удаление пустых колонок, если axis=0, то строк
-    # custom_row = custom_row.dropna(axis=0, how='any')  # Удаление строк в которых есть хоть одно пустое значение, axis=1
-    '''
-
-    pass
-
+    df_result['Итого по компании'] = df_result.sum(axis=1)
+    df_result.to_excel('test.xlsx')
     return
 
 
-
 if __name__ == '__main__':
-
-    salesFilelist = search_file ( salesName )
-    minStockFilelist = search_file ( minStockName )
+    salesFilelist = search_file(salesName)
+    minStockFilelist = search_file(minStockName)
     # print ( salesFilelist )
     # print ( minStockFilelist )
-    read_xlsx ( salesFilelist )
+    read_xlsx(salesFilelist)
 
     '''
     Блок №1
     Чтение данных за прошедший месяц, сортировка и запись суммовых значений в итоговый файл с данными
-    
+
     print("Начало Блока №1")
     # Поиск списков файлов для чтения и распределение по типам файлов
     file_custom_order, file_supp_order, file_supp_receipt, file_sms = search_file()
@@ -111,10 +98,10 @@ if __name__ == '__main__':
     # Добавляем в файл данных по поставщикам, данные по Заказам поставщикам
     append_file_data(file_supp, total_supp)
     print("Блок №1 завершён!")
-    
+
     Блок №2
     Чтение данных из файлов данных, построение графиков и запись итоговых файлов для отпрвки по почте
-    
+
     # Считываем данные за всё время и формируем итоговый файл по Заказам для наличия
     print("Начало Блока №2")
     # print(file_custom, file_supp) # Используем при тестах
@@ -136,10 +123,10 @@ if __name__ == '__main__':
     result_to_xlsx(out_file_custom, data_pt_custom, custom_category, caption_custom, sec_level_custom, custom_index)
     result_to_xlsx(out_file_supp, data_pt_supp, supp_category, caption_supp, sec_level_supp, supp_index_out)
     print("Блок №2 завершён!")
-    
+
     Блок №3
     Отправка файлов по почте и выдержка по количеству строк в теле письма
-    
+
     # Подготавливаем и отправляем данные по почте Юре
     print("Начало Блока №3")
     send_mail()
