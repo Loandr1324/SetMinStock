@@ -4,7 +4,7 @@
 #  1. Создать отдельный файл программы для чтения файлов эксель. Передавать туда маску наименования файла, который требуется прочитать.
 #  Готово 2. Прочитать все файлы по продажам и объединить
 #  Готово 3. Прочитать все файлы МО и объединить.
-#  Не дулаем 4. Прочиттаь старый итоговый файл и взять от туда старые данные по продажам
+#  Не делаем 4. Прочитать старый итоговый файл и взять от туда старые данные по продажам
 #  5. Занести все данные в новый файл и
 #  6. найти отличия новых данных по продажам по всей компании со старыми и записать в отдельную колонку
 #  7. Отформатировать все строки, выделить те строки в которых в колонке Отличие значение не равно нулю
@@ -46,9 +46,8 @@ def read_xlsx(file_list, add_name):
     df_result = None
 
     for filename in file_list: # проходим по каждому элементу списка файлов
-        print(filename) # для тестов выводим в консоль наименование файла с которым проходит работа
-        df = pd.read_excel(filename, sheet_name='TDSheet', header=None, usecols="A:I",
-                           skipfooter=1, engine='openpyxl')
+        print (filename) # для тестов выводим в консоль наименование файла с которым проходит работа
+        df = read_excel(filename)
         df_search_header = df.iloc[:15, :2] # для ускорения работы выбираем из DataFrame первую колонку и 15 строк
         # print (df_search_header)
         # создаём маску и отмечаем True строку где есть слово "Номенклатура", остальные False
@@ -56,7 +55,7 @@ def read_xlsx(file_list, add_name):
         # Преобразуем Dataframe согласно маски. После обработки все значения будут NaN кроме нужного нам.
         # В этой же строке кода удаляем все строки со значением NaN и далее получаем индекс оставшейся строки
         f = df_search_header[mask].dropna(axis=0, how='all').index.values # Удаление пустых колонок, если axis=0, то строк
-        print ( f )
+        print ( 'Номер строки с заколовком:' + f )
         # print (df.iloc[:15, :2])
         df = df.iloc[int(f):, :] # Убираем все строки с верха DF до заголовков
         df = df.dropna(axis=1, how='all')  # Убираем пустые колонки
@@ -77,6 +76,53 @@ def read_xlsx(file_list, add_name):
         df_result['Компания MaCar продажи'] = df_result.sum(axis=1)
 
     return df_result
+
+def read_excel (file_name):
+    """
+    Пытаемся прочитать файл xlxs, если не получается, то исправляем ошибку и опять читаем файл
+    :param file_name: Имя файла для чтения
+    :return: DataFrame
+    """
+    print ('Попытка загрузки файла:'+file_name)
+    try:
+        df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+        return (df)
+    except KeyError as Error:
+        print (Error)
+        df = None
+        if str(Error) == "\"There is no item named 'xl/sharedStrings.xml' in the archive\"":
+            bug_fix (file_name)
+            print('Исправлена ошибка: ', Error, f'в файле: \"{file_name}\"\n')
+            df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+            return df
+        else:
+            print('Ошибка: >>' + str(Error) + '<<')
+
+def bug_fix (file_name):
+    """
+    Переименовываем не корректное имя файла в архиве excel
+    :param file_name: Имя excel файла
+    """
+    import shutil
+    from zipfile import ZipFile
+
+    # Создаем временную папку
+    tmp_folder = '/temp/'
+    os.makedirs(tmp_folder, exist_ok=True)
+
+    # Распаковываем excel как zip в нашу временную папку и удаляем excel
+    with ZipFile(file_name) as excel_container:
+        excel_container.extractall(tmp_folder)
+    os.remove(file_name)
+
+    # Переименовываем файл с неверным названием
+    wrong_file_path = os.path.join(tmp_folder, 'xl', 'SharedStrings.xml')
+    correct_file_path = os.path.join(tmp_folder, 'xl', 'sharedStrings.xml')
+    os.rename(wrong_file_path, correct_file_path)
+
+    # Запаковываем excel обратно в zip и переименовываем в исходный файл
+    shutil.make_archive('Установка МО ответственным/correct_file', 'zip', tmp_folder)
+    os.rename('Установка МО ответственным/correct_file.zip', file_name)
 
 def concat_df(df1, df2):
     df = pd.concat([df1, df2], axis=1, ignore_index=False, levels=['Код'])
