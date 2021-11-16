@@ -16,7 +16,6 @@ import pandas as pd
 import numpy as np
 import os
 
-# import readfile
 
 FOLDER = 'Установка МО ответственным'
 salesName = 'продажи'
@@ -35,8 +34,7 @@ def search_file(name):
             pass
     return filelist
 
-
-def read_xlsx(file_list, add_name):
+def create_df (file_list, add_name):
     """
     :param file_list: Загружаем в DataFrame файлы из file_list
     :param add_name: Добавляем add_name в наименование колонок DataFrame
@@ -55,7 +53,6 @@ def read_xlsx(file_list, add_name):
         # Преобразуем Dataframe согласно маски. После обработки все значения будут NaN кроме нужного нам.
         # В этой же строке кода удаляем все строки со значением NaN и далее получаем индекс оставшейся строки
         f = df_search_header[mask].dropna(axis=0, how='all').index.values # Удаление пустых колонок, если axis=0, то строк
-        print ( 'Номер строки с заколовком:' + f )
         # print (df.iloc[:15, :2])
         df = df.iloc[int(f):, :] # Убираем все строки с верха DF до заголовков
         df = df.dropna(axis=1, how='all')  # Убираем пустые колонки
@@ -64,16 +61,14 @@ def read_xlsx(file_list, add_name):
         df.iloc[0, 1] = 'Номенклатура'
         df.columns = df.iloc[0] # Значения из найденной строки переносим в заголовки DataFrame для простоты дальнейшего обращения
         df = df.iloc[2:, :] # Убираем две строки с верха DF
+        df['Номенклатура'] = df['Номенклатура'].str.strip() # Удалить пробелы с обоих концов строки в ячейке
         df.set_index(['Код', 'Номенклатура'], inplace=True) # переносим колонки в индекс, для упрощения дальнейшей работы
-        print(df.iloc[:15, :2]) # Для тестов выводим в консоль 15 строк и два столбца полученного DF
+        # print(df.iloc[:15, :2]) # Для тестов выводим в консоль 15 строк и два столбца полученного DF
         # Добавляем преобразованный DF в результирующий DF
         df_result = concat_df(df_result, df)
-    # Добавляем в результирующий DF по продажам колоку и подставляем в неё сумму всех колонок
+    # Добавляем в результирующий DF по продажам расчётные данные
     if add_name == 'продажи':
-        df_result = df_result.astype('Int32')
-        df_result = df_result / 4
-        df_result = df_result.apply(np.ceil)
-        df_result['Компания MaCar продажи'] = df_result.sum(axis=1)
+        df_result = payment(df_result)
 
     return df_result
 
@@ -129,19 +124,133 @@ def concat_df(df1, df2):
     return df
 
 def sort_df (df):
-    sort_list = ['01 Кирова продажи', '01 Кирова МО', '02 Автолюбитель продажи', '02 Автолюбитель МО',
-                 '03 Интер продажи', '03 Интер МО',	'04 Победа продажи', '04 Победа МО',
-                 '08 Центр продажи', '08 Центр МО',	'09 Вокзалка продажи', '09 Вокзалка МО',
-                 '05 Павловский продажи',	'05 Павловский МО',	'Компания MaCar продажи', 'Компания MaCar МО']
+    sort_list = ['01 Кирова продажи', '01 Кирова МО', '01 Кирова МО расчёт',
+                 '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюб. МО расчёт',
+                 '03 Интер продажи', '03 Интер МО',	'03 Интер МО расчёт',
+                 '04 Победа продажи', '04 Победа МО', '04 Победа МО расчёт',
+                 '08 Центр продажи', '08 Центр МО',	'08 Центр МО расчёт',
+                 '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
+                 '05 Павловский продажи', '05 Павловский МО', '05 Павловский МО расчёт',
+                 'Компания MaCar продажи', 'Компания MaCar МО', 'Компания MaCar МО расчёт']
     df = df[sort_list]
     return df
+
+def payment (df_payment):
+    df_payment = df_payment.astype('Int32')
+    df_payment['Компания MaCar продажи'] = df_payment.sum(axis=1)
+
+    list_colums_payment = ['01 Кирова МО расчёт', '02 Автолюб. МО расчёт', '03 Интер МО расчёт',
+                           '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт',
+                           '05 Павловский МО расчёт']
+
+    list_colums_sales = ['01 Кирова продажи', '02 Автолюбитель продажи', '03 Интер продажи',
+                         '04 Победа продажи', '08 Центр продажи', '09 Вокзалка продажи',
+                         '05 Павловский продажи']
+
+    for i in range(len(list_colums_payment)):
+        df_payment[list_colums_payment[i]] = (df_payment[list_colums_sales[i]] / 4).apply(np.ceil)
+
+    df_payment['Компания MaCar МО расчёт'] = df_payment[list_colums_payment].sum(axis=1)
+
+    return df_payment
+
+def df_write_xlsx(df):
+    pd.io.formats.excel.ExcelFormatter.header_style = None # сбрасываем встроенный формат заголовков pandas
+    name_file = 'test_write.xlsx'
+    sheet_name = 'Данные'  # Наименование вкладки для сводной таблицы
+    # sheet_name2 = 'Графики'  # Наименование вкладки для графиков
+    writer = pd.ExcelWriter(name_file, engine='xlsxwriter')  # Открываем файл для записи
+    workbook = writer.book
+    # Получаем словари форматов для эксель
+    header_format, caption_format, sales_type_format, name_format, sum_format, data_format = format_custom(workbook)
+
+    df.to_excel(writer, sheet_name=sheet_name)
+    wks1 = writer.sheets[sheet_name]  # Открываем вкладку для форматирования
+    # Запись и формат заголовка таблицы
+    wks1.set_default_row(12)
+    wks1.set_row(0, 40, header_format)
+    wks1.set_column('A:A', 12, name_format)
+    wks1.set_column('B:B', 32, name_format)
+    wks1.set_column('C:Z', 10, data_format)
+
+    wks1.autofilter(0, 0, len(df)+1, len(df.columns)+1) # Добавляем фильтр в первую колонку
+    # Изменяем формат всей строки для каждого года с данными о количестве и сумме
+    i = 0
+    #print (len (df))
+    while i < len(df):
+        # wks1.set_row(i+1, 12, None)  # Изменяем высоту 1-ой строки
+        #print (i)
+        i += 1
+
+    #wks1.set_column('D:D', 18, data_format)  # Изменяем ширину и формат колнки с суммой
+    # wks1.write('A2', caption, caption_format)
+    # Добавление отображение итогов группировок сверху
+    wks1.outline_settings(True, False, False, False)
+
+    writer.save()
+    return
+
+def format_custom(workbook):
+    header_format = workbook.add_format({
+        'font_name': 'Arial',
+        'font_size': '7',
+        'align': 'center',
+        'valign': 'top',
+        'text_wrap': True,
+        'bold': True,
+        'bg_color': '#F4ECC5',
+        'border': True,
+        'border_color': '#CCC085'
+    })
+    sales_type_format = workbook.add_format({
+        'font_name': 'Arial',
+        'font_size': '8',
+        'align': 'left',
+        'border': True,
+        'border_color': '#CCC085',
+        'bg_color': '#F8F2D8'
+    })
+    name_format = workbook.add_format({
+        'font_name': 'Arial',
+        'font_size': '8',
+        'align': 'left',
+        'valign': 'top',
+        'text_wrap': True,
+        'bold': False,
+        'border': True,
+        'border_color': '#CCC085'
+    })
+    sum_format = workbook.add_format({
+        'num_format': '# ### ##0.00"р.";[red]-# ##0.00"р."',
+        'font_name': 'Arial',
+        'font_size': '8',
+        'border': True,
+        'border_color': '#CCC085'
+    })
+    data_format = workbook.add_format({
+        'num_format': '# ### ##0.00',
+        'font_name': 'Arial',
+        'font_size': '7',
+        'text_wrap': True,
+        'border': True,
+        'border_color': '#CCC085'
+    })
+    caption_format = workbook.add_format({
+        'font_name': 'Arial',
+        'font_size': '14',
+        'bold': True,
+        'border': True,
+        'border_color': '#CCC085'
+    })
+
+    return header_format, caption_format, sales_type_format, name_format, sum_format, data_format
 
 if __name__ == '__main__':
     salesFilelist = search_file(salesName) # запускаем функцию по поиску файлов и получаем список файлов
     minStockFilelist = search_file(minStockName) # запускаем функцию по поиску файлов и получаем список файлов
-    df_sales = read_xlsx (salesFilelist, salesName)
-    df_minStock = read_xlsx (minStockFilelist, minStockName)
+    df_sales = create_df (salesFilelist, salesName)
+    df_minStock = create_df (minStockFilelist, minStockName)
     df_general = concat_df (df_sales, df_minStock)
     df_general = sort_df(df_general) # сортируем столбцы
-    df_general = df_general.reset_index()
-    df_general.to_excel ('test.xlsx', index=False)  # записываем полученные джанные в эксель.
+    # df_general.to_excel ('test.xlsx')  # записываем полученные джанные в эксель.
+    df_write_xlsx(df_general)
