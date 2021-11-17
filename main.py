@@ -69,7 +69,6 @@ def create_df (file_list, add_name):
     # Добавляем в результирующий DF по продажам расчётные данные
     if add_name == 'продажи':
         df_result = payment(df_result)
-
     return df_result
 
 def read_excel (file_name):
@@ -131,7 +130,8 @@ def sort_df (df):
                  '08 Центр продажи', '08 Центр МО',	'08 Центр МО расчёт',
                  '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
                  '05 Павловский продажи', '05 Павловский МО', '05 Павловский МО расчёт',
-                 'Компания MaCar продажи', 'Компания MaCar МО', 'Компания MaCar МО расчёт']
+                 'Компания MaCar продажи', 'Компания MaCar МО', 'Компания MaCar МО расчёт',
+                 'Компания MaCar МО техническое']
     df = df[sort_list]
     return df
 
@@ -162,7 +162,7 @@ def df_write_xlsx(df):
     writer = pd.ExcelWriter(name_file, engine='xlsxwriter')  # Открываем файл для записи
     workbook = writer.book
     # Получаем словари форматов для эксель
-    header_format, caption_format, sales_type_format, name_format, sum_format, data_format = format_custom(workbook)
+    header_format, con_format, border_storage_format, name_format, MO_format, data_format = format_custom(workbook)
 
     df.to_excel(writer, sheet_name=sheet_name)
     wks1 = writer.sheets[sheet_name]  # Открываем вкладку для форматирования
@@ -173,19 +173,26 @@ def df_write_xlsx(df):
     wks1.set_column('B:B', 32, name_format)
     wks1.set_column('C:Z', 10, data_format)
 
-    wks1.autofilter(0, 0, len(df)+1, len(df.columns)+1) # Добавляем фильтр в первую колонку
-    # Изменяем формат всей строки для каждого года с данными о количестве и сумме
-    i = 0
-    #print (len (df))
-    while i < len(df):
-        # wks1.set_row(i+1, 12, None)  # Изменяем высоту 1-ой строки
-        #print (i)
-        i += 1
+    row_end, col_end = len(df), len(df.columns)
+    row_end_str, col_end_str = str(row_end), str(col_end)
 
-    #wks1.set_column('D:D', 18, data_format)  # Изменяем ширину и формат колнки с суммой
-    # wks1.write('A2', caption, caption_format)
+    wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
+                                                    'criteria': f'=$Y2:$Y{row_end_str}=0',
+                                                    'format': con_format})
+    wks1.set_column(col_end, col_end, None, None, {'hidden': 1})
+    wks1.autofilter(0, 0, row_end+1, col_end+1) # Добавляем фильтр в первую колонку
+    i = 2
+    while i < col_end+3:
+        wks1.set_column(i, i, None, border_storage_format)
+        wks1.set_column(i+1, i+1, None, MO_format)
+        # wks1.set_row(i+1, 12, None)  # Изменяем высоту 1-ой строки
+        i += 3
+    f = 2
+    while f-1 <= row_end:
+        wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
+        f += 1
     # Добавление отображение итогов группировок сверху
-    wks1.outline_settings(True, False, False, False)
+    #wks1.outline_settings(True, False, False, False)
 
     writer.save()
     return
@@ -202,13 +209,12 @@ def format_custom(workbook):
         'border': True,
         'border_color': '#CCC085'
     })
-    sales_type_format = workbook.add_format({
+    border_storage_format = workbook.add_format({
+        'num_format': '# ### ##0.00',
         'font_name': 'Arial',
         'font_size': '8',
-        'align': 'left',
-        'border': True,
-        'border_color': '#CCC085',
-        'bg_color': '#F8F2D8'
+        'left': 2,
+        'border_color': '#000000'
     })
     name_format = workbook.add_format({
         'font_name': 'Arial',
@@ -220,30 +226,29 @@ def format_custom(workbook):
         'border': True,
         'border_color': '#CCC085'
     })
-    sum_format = workbook.add_format({
-        'num_format': '# ### ##0.00"р.";[red]-# ##0.00"р."',
+    MO_format = workbook.add_format({
+        'num_format': '# ### ##0.00;;',
+        'bold': True,
         'font_name': 'Arial',
         'font_size': '8',
+        'font_color': '#FF0000',
+        'text_wrap': True,
         'border': True,
         'border_color': '#CCC085'
     })
     data_format = workbook.add_format({
         'num_format': '# ### ##0.00',
         'font_name': 'Arial',
-        'font_size': '7',
+        'font_size': '8',
         'text_wrap': True,
-        'border': True,
-        'border_color': '#CCC085'
+        #'border': True,
+        #'border_color': '#CCC085'
     })
-    caption_format = workbook.add_format({
-        'font_name': 'Arial',
-        'font_size': '14',
-        'bold': True,
-        'border': True,
-        'border_color': '#CCC085'
+    con_format = workbook.add_format({
+        'bg_color': '#FED69C',
     })
 
-    return header_format, caption_format, sales_type_format, name_format, sum_format, data_format
+    return header_format, con_format, border_storage_format, name_format, MO_format, data_format
 
 if __name__ == '__main__':
     salesFilelist = search_file(salesName) # запускаем функцию по поиску файлов и получаем список файлов
@@ -251,6 +256,7 @@ if __name__ == '__main__':
     df_sales = create_df (salesFilelist, salesName)
     df_minStock = create_df (minStockFilelist, minStockName)
     df_general = concat_df (df_sales, df_minStock)
+    df_general['Компания MaCar МО техническое'] = df_general['Компания MaCar МО']
     df_general = sort_df(df_general) # сортируем столбцы
     # df_general.to_excel ('test.xlsx')  # записываем полученные джанные в эксель.
     df_write_xlsx(df_general)
