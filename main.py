@@ -155,46 +155,53 @@ def payment (df_payment):
     return df_payment
 
 def df_write_xlsx(df):
-    pd.io.formats.excel.ExcelFormatter.header_style = None # сбрасываем встроенный формат заголовков pandas
-    name_file = 'test_write.xlsx'
+    # Сохраняем в переменные значения конечных строк и столбцов
+    row_end, col_end = len(df), len(df.columns)
+    row_end_str, col_end_str = str(row_end), str(col_end)
+
+    # Сбрасываем встроенный формат заголовков pandas
+    pd.io.formats.excel.ExcelFormatter.header_style = None
+
+    # Создаём эксельи сохраняем данные
+    name_file = 'Анализ МО по компании.xlsx'
     sheet_name = 'Данные'  # Наименование вкладки для сводной таблицы
-    # sheet_name2 = 'Графики'  # Наименование вкладки для графиков
-    writer = pd.ExcelWriter(name_file, engine='xlsxwriter')  # Открываем файл для записи
+    writer = pd.ExcelWriter(name_file, engine='xlsxwriter')
     workbook = writer.book
+    df.to_excel(writer, sheet_name=sheet_name)
+    wks1 = writer.sheets[sheet_name]  # Сохраняем в переменную вкладку для форматирования
+
     # Получаем словари форматов для эксель
     header_format, con_format, border_storage_format, name_format, MO_format, data_format = format_custom(workbook)
 
-    df.to_excel(writer, sheet_name=sheet_name)
-    wks1 = writer.sheets[sheet_name]  # Открываем вкладку для форматирования
-    # Запись и формат заголовка таблицы
+    # Форматируем таблицу
     wks1.set_default_row(12)
     wks1.set_row(0, 40, header_format)
     wks1.set_column('A:A', 12, name_format)
     wks1.set_column('B:B', 32, name_format)
     wks1.set_column('C:Z', 10, data_format)
-
-    row_end, col_end = len(df), len(df.columns)
-    row_end_str, col_end_str = str(row_end), str(col_end)
-
-    wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
-                                                    'criteria': f'=$Y2:$Y{row_end_str}=0',
-                                                    'format': con_format})
     wks1.set_column(col_end, col_end, None, None, {'hidden': 1})
-    wks1.autofilter(0, 0, row_end+1, col_end+1) # Добавляем фильтр в первую колонку
+
+    # Делаем жирным рамку между складами и форматируем колонку с МО по всем складам
     i = 2
     while i < col_end+3:
         wks1.set_column(i, i, None, border_storage_format)
         wks1.set_column(i+1, i+1, None, MO_format)
-        # wks1.set_row(i+1, 12, None)  # Изменяем высоту 1-ой строки
         i += 3
+
+    # Подставляем формулу в колонку с МО по всей компании
     f = 2
     while f-1 <= row_end:
         wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
         f += 1
-    # Добавление отображение итогов группировок сверху
-    #wks1.outline_settings(True, False, False, False)
 
-    writer.save()
+    # Добавляем выделение цыетом строки при МО=0 по всей компании
+    wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
+                                                   'criteria': f'=$Y2:$Y{row_end_str}=0',
+                                                   'format': con_format})
+
+    # Добавляем фильтр в первую колонку
+    wks1.autofilter(0, 0, row_end+1, col_end+1)
+    writer.save() # Сохраняем файл
     return
 
 def format_custom(workbook):
