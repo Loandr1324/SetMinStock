@@ -179,7 +179,6 @@ def df_write_xlsx(df):
     wks1.set_column('A:A', 12, name_format)
     wks1.set_column('B:B', 32, name_format)
     wks1.set_column('C:Z', 10, data_format)
-    wks1.set_column(col_end, col_end, None, None, {'hidden': 1})
 
     # Делаем жирным рамку между складами и форматируем колонку с МО по всем складам
     i = 2
@@ -194,13 +193,14 @@ def df_write_xlsx(df):
         wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
         f += 1
 
-    # Добавляем выделение цыетом строки при МО=0 по всей компании
+    # Добавляем выделение цветом строки при МО=0 по всей компании
     wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
                                                    'criteria': f'=$Y2:$Y{row_end_str}=0',
                                                    'format': con_format})
 
     # Добавляем фильтр в первую колонку
-    wks1.autofilter(0, 0, row_end+1, col_end+1)
+    wks1.autofilter(0, 0, row_end+1, col_end)
+    wks1.set_column(col_end+1, col_end+1, None, None, {'hidden': 1})
     writer.save() # Сохраняем файл
     return
 
