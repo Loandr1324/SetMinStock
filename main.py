@@ -17,7 +17,7 @@ import numpy as np
 import os
 
 
-FOLDER = 'Установка МО ответственным'
+FOLDER = 'Исходные данные'
 salesName = 'продажи'
 minStockName = 'МО'
 
@@ -115,8 +115,8 @@ def bug_fix (file_name):
     os.rename(wrong_file_path, correct_file_path)
 
     # Запаковываем excel обратно в zip и переименовываем в исходный файл
-    shutil.make_archive('Установка МО ответственным/correct_file', 'zip', tmp_folder)
-    os.rename('Установка МО ответственным/correct_file.zip', file_name)
+    shutil.make_archive(f'{FOLDER}/correct_file', 'zip', tmp_folder)
+    os.rename(f'{FOLDER}/correct_file.zip', file_name)
 
 def concat_df(df1, df2):
     df = pd.concat([df1, df2], axis=1, ignore_index=False, levels=['Код'])
@@ -171,20 +171,22 @@ def df_write_xlsx(df):
     wks1 = writer.sheets[sheet_name]  # Сохраняем в переменную вкладку для форматирования
 
     # Получаем словари форматов для эксель
-    header_format, con_format, border_storage_format, name_format, MO_format, data_format = format_custom(workbook)
+    header_format, con_format, border_storage_format_left, border_storage_format_right, \
+    name_format, MO_format, data_format = format_custom(workbook)
 
     # Форматируем таблицу
     wks1.set_default_row(12)
     wks1.set_row(0, 40, header_format)
     wks1.set_column('A:A', 12, name_format)
     wks1.set_column('B:B', 32, name_format)
-    wks1.set_column('C:Z', 10, data_format)
+    wks1.set_column('C:AA', 10, data_format)
 
     # Делаем жирным рамку между складами и форматируем колонку с МО по всем складам
     i = 2
-    while i < col_end+3:
-        wks1.set_column(i, i, None, border_storage_format)
+    while i < col_end+1:
+        wks1.set_column(i, i, None, border_storage_format_left)
         wks1.set_column(i+1, i+1, None, MO_format)
+        wks1.set_column(i+2, i+2, None, border_storage_format_right)
         i += 3
 
     # Подставляем формулу в колонку с МО по всей компании
@@ -195,8 +197,9 @@ def df_write_xlsx(df):
 
     # Добавляем выделение цветом строки при МО=0 по всей компании
     wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
-                                                   'criteria': f'=$Y2:$Y{row_end_str}=0',
+                                                   'criteria': '=AND($Y2=0,$X2<>0)',
                                                    'format': con_format})
+
 
     # Добавляем фильтр в первую колонку
     wks1.autofilter(0, 0, row_end+1, col_end)
@@ -216,13 +219,34 @@ def format_custom(workbook):
         'border': True,
         'border_color': '#CCC085'
     })
-    border_storage_format = workbook.add_format({
+
+    border_storage_format_left = workbook.add_format({
         'num_format': '# ### ##0.00',
         'font_name': 'Arial',
         'font_size': '8',
         'left': 2,
-        'border_color': '#000000'
+        'left_color': '#000000',
+        'bottom': True,
+        'bottom_color': '#CCC085',
+        'top': True,
+        'top_color': '#CCC085',
+        'right': True,
+        'right_color': '#CCC085',
     })
+    border_storage_format_right = workbook.add_format({
+        'num_format': '# ### ##0.00',
+        'font_name': 'Arial',
+        'font_size': '8',
+        'right': 2,
+        'right_color': '#000000',
+        'bottom': True,
+        'bottom_color': '#CCC085',
+        'top': True,
+        'top_color': '#CCC085',
+        'left': True,
+        'left_color': '#CCC085',
+    })
+
     name_format = workbook.add_format({
         'font_name': 'Arial',
         'font_size': '8',
@@ -233,13 +257,14 @@ def format_custom(workbook):
         'border': True,
         'border_color': '#CCC085'
     })
+
     MO_format = workbook.add_format({
         'num_format': '# ### ##0.00;;',
         'bold': True,
         'font_name': 'Arial',
         'font_size': '8',
         'font_color': '#FF0000',
-        'text_wrap': True,
+        # 'text_wrap': True,
         'border': True,
         'border_color': '#CCC085'
     })
@@ -248,14 +273,15 @@ def format_custom(workbook):
         'font_name': 'Arial',
         'font_size': '8',
         'text_wrap': True,
-        #'border': True,
-        #'border_color': '#CCC085'
+        'border': True,
+        'border_color': '#CCC085'
     })
     con_format = workbook.add_format({
         'bg_color': '#FED69C',
     })
 
-    return header_format, con_format, border_storage_format, name_format, MO_format, data_format
+    return header_format, con_format, border_storage_format_left, border_storage_format_right, \
+           name_format, MO_format, data_format
 
 if __name__ == '__main__':
     salesFilelist = search_file(salesName) # запускаем функцию по поиску файлов и получаем список файлов
