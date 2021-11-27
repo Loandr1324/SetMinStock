@@ -79,7 +79,10 @@ def read_excel (file_name):
     """
     print ('Попытка загрузки файла:'+file_name)
     try:
-        df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+        if 'продажи' in file_name:
+            df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+        else:
+            df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=0, engine='openpyxl')
         return (df)
     except KeyError as Error:
         print (Error)
@@ -87,7 +90,10 @@ def read_excel (file_name):
         if str(Error) == "\"There is no item named 'xl/sharedStrings.xml' in the archive\"":
             bug_fix (file_name)
             print('Исправлена ошибка: ', Error, f'в файле: \"{file_name}\"\n')
-            df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+            if 'продажи' in file_name:
+                df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+            else:
+                df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=0, engine='openpyxl')
             return df
         else:
             print('Ошибка: >>' + str(Error) + '<<')
@@ -192,7 +198,7 @@ def df_write_xlsx(df):
     # Подставляем формулу в колонку с МО по всей компании
     f = 2
     while f-1 <= row_end:
-        wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
+        wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>=1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
         f += 1
 
     # Добавляем выделение цветом строки при МО=0 по всей компании
