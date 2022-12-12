@@ -1,15 +1,17 @@
 # Author Loik Andrey 7034@balancedv.ru
 # TODO
 #  Часть 1
-#  1. Создать отдельный файл программы для чтения файлов эксель. Передавать туда маску наименования файла, который требуется прочитать.
+#  1. Создать отдельный файл программы для чтения файлов эксель. Передавать туда маску наименования файла,
+#  который требуется прочитать.
 #  Готово 2. Прочитать все файлы по продажам и объединить
 #  Готово 3. Прочитать все файлы МО и объединить.
 #  Не делаем 4. Прочитать старый итоговый файл и взять от туда старые данные по продажам
 #  5. Занести все данные в новый файл и
 #  6. найти отличия новых данных по продажам по всей компании со старыми и записать в отдельную колонку
 #  7. Отформатировать все строки, выделить те строки в которых в колонке Отличие значение не равно нулю
-#  Часть 2
-#  8. Считать значения МО из эксель файл полученного после редактирования отвественным заказчиком итого вого файла из Части 1
+#  Часть 2.
+#  8. Считать значения МО из эксель файл полученного после редактирования
+#  отвественным заказчиком итого вого файла из Части 1
 #  9. Создать файл для загрузки значений МО, которые были считаны в п.7
 
 import pandas as pd
@@ -21,6 +23,7 @@ FOLDER = 'Исходные данные'
 salesName = 'продажи'
 minStockName = 'МО'
 
+
 def search_file(name):
     """
     :param name: Поиск всех файлов в папке FOLDER, в наименовании которых, содержится name
@@ -28,13 +31,15 @@ def search_file(name):
     """
     filelist = []
     for item in os.listdir(FOLDER):
-        if name in item and item.endswith('.xlsx'): # если файл содержит name и с расширенитем .xlsx, то выполняем
-            filelist.append(FOLDER + "/" + item) # добаляем в список папку и имя файла для последующего обращения из списка
+        if name in item and item.endswith('.xlsx'):  # если файл содержит name и с расширенитем .xlsx, то выполняем
+            # Добавляем в список папку и имя файла для последующего обращения из списка
+            filelist.append(FOLDER + "/" + item)
         else:
             pass
     return filelist
 
-def create_df (file_list, add_name):
+
+def create_df(file_list, add_name):
     """
     :param file_list: Загружаем в DataFrame файлы из file_list
     :param add_name: Добавляем add_name в наименование колонок DataFrame
@@ -43,35 +48,40 @@ def create_df (file_list, add_name):
 
     df_result = None
 
-    for filename in file_list: # проходим по каждому элементу списка файлов
-        print (filename) # для тестов выводим в консоль наименование файла с которым проходит работа
+    for filename in file_list:  # проходим по каждому элементу списка файлов
+        print(filename)  # для тестов выводим в консоль наименование файла с которым проходит работа
         df = read_excel(filename)
-        df_search_header = df.iloc[:15, :2] # для ускорения работы выбираем из DataFrame первую колонку и 15 строк
-        # print (df_search_header)
+        df_search_header = df.iloc[:15, :2]  # для ускорения работы выбираем из DataFrame первую колонку и 15 строк
+        # print(df_search_header)
         # создаём маску и отмечаем True строку где есть слово "Номенклатура", остальные False
         mask = df_search_header.replace('.*Номенклатура.*', True, regex=True).eq(True)
-        # Преобразуем Dataframe согласно маски. После обработки все значения будут NaN кроме нужного нам.
+        # Преобразуем Dataframe согласно маске. После обработки все значения будут NaN кроме нужного нам.
         # В этой же строке кода удаляем все строки со значением NaN и далее получаем индекс оставшейся строки
-        f = df_search_header[mask].dropna(axis=0, how='all').index.values # Удаление пустых колонок, если axis=0, то строк
-        # print (df.iloc[:15, :2])
-        df = df.iloc[int(f):, :] # Убираем все строки с верха DF до заголовков
+        f = df_search_header[mask].dropna(axis=0, how='all').index.values # Удаление пустых строк
+        df = df.iloc[int(f):, :]  # Убираем все строки с верха DF до заголовков
         df = df.dropna(axis=1, how='all')  # Убираем пустые колонки
-        df.iloc[0, :] = df.iloc[0, :] + ' ' + add_name # Добавляем в наименование тип данных
+        df.iloc[0, :] = df.iloc[0, :] + ' ' + add_name  # Добавляем в наименование тип данных
         df.iloc[0, 0] = 'Код'
         df.iloc[0, 1] = 'Номенклатура'
-        df.columns = df.iloc[0] # Значения из найденной строки переносим в заголовки DataFrame для простоты дальнейшего обращения
-        df = df.iloc[2:, :] # Убираем две строки с верха DF
-        df['Номенклатура'] = df['Номенклатура'].str.strip() # Удалить пробелы с обоих концов строки в ячейке
-        df.set_index(['Код', 'Номенклатура'], inplace=True) # переносим колонки в индекс, для упрощения дальнейшей работы
-        # print(df.iloc[:15, :2]) # Для тестов выводим в консоль 15 строк и два столбца полученного DF
+        # Значения из найденной строки переносим в заголовки DataFrame для простоты дальнейшего обращения
+        df.columns = df.iloc[0].values
+        df = df.iloc[2:, :]  # Убираем две строки с верха DF
+        df['Номенклатура'] = df['Номенклатура'].str.strip()  # Удалить пробелы с обоих концов строки в ячейке
+        # Переносим колонки в индекс, для упрощения дальнейшей работы
+        df.set_index(['Код', 'Номенклатура'], inplace=True)
+
         # Добавляем преобразованный DF в результирующий DF
-        df_result = concat_df(df_result, df)
+        if df_result is None:
+            df_result = df
+        else:
+            df_result = concat_df(df_result, df)
     # Добавляем в результирующий DF по продажам расчётные данные
     if add_name == 'продажи':
         df_result = payment(df_result)
     return df_result
 
-def read_excel (file_name):
+
+def read_excel(file_name):
     """
     Пытаемся прочитать файл xlxs, если не получается, то исправляем ошибку и опять читаем файл
     :param file_name: Имя файла для чтения
@@ -98,7 +108,8 @@ def read_excel (file_name):
         else:
             print('Ошибка: >>' + str(Error) + '<<')
 
-def bug_fix (file_name):
+
+def bug_fix(file_name):
     """
     Переименовываем не корректное имя файла в архиве excel
     :param file_name: Имя excel файла
@@ -124,11 +135,14 @@ def bug_fix (file_name):
     shutil.make_archive(f'{FOLDER}/correct_file', 'zip', tmp_folder)
     os.rename(f'{FOLDER}/correct_file.zip', file_name)
 
+
 def concat_df(df1, df2):
-    df = pd.concat([df1, df2], axis=1, ignore_index=False, levels=['Код'])
+    # df = pd.concat([df1, df2], axis=1, ignore_index=False, levels=['Код'])
+    df = pd.concat([df1, df2], axis=1, ignore_index=False)
     return df
 
-def sort_df (df):
+
+def sort_df(df):
     sort_list = ['01 Кирова продажи', '01 Кирова МО', '01 Кирова МО расчёт',
                  '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюб. МО расчёт',
                  '03 Интер продажи', '03 Интер МО',	'03 Интер МО расчёт',
@@ -141,7 +155,8 @@ def sort_df (df):
     df = df[sort_list]
     return df
 
-def payment (df_payment):
+
+def payment(df_payment):
     df_payment = df_payment.astype('Int32')
     df_payment['Компания MaCar продажи'] = df_payment.sum(axis=1)
 
@@ -154,64 +169,70 @@ def payment (df_payment):
                          '05 Павловский продажи']
 
     for i in range(len(list_colums_payment)):
+
+        print(df_payment[list_colums_sales[i]])
         df_payment[list_colums_payment[i]] = (df_payment[list_colums_sales[i]] / 4).apply(np.ceil)
 
     df_payment['Компания MaCar МО расчёт'] = df_payment[list_colums_payment].sum(axis=1)
 
     return df_payment
 
+
 def df_write_xlsx(df):
     # Сохраняем в переменные значения конечных строк и столбцов
     row_end, col_end = len(df), len(df.columns)
     row_end_str, col_end_str = str(row_end), str(col_end)
 
-    # Сбрасываем встроенный формат заголовков pandas
-    pd.io.formats.excel.ExcelFormatter.header_style = None
+    # Для простоты форматирования переводим индекс колонки
+    df.reset_index(inplace=True)
 
     # Создаём эксельи сохраняем данные
     name_file = 'Анализ МО по компании.xlsx'
     sheet_name = 'Данные'  # Наименование вкладки для сводной таблицы
-    writer = pd.ExcelWriter(name_file, engine='xlsxwriter')
-    workbook = writer.book
-    df.to_excel(writer, sheet_name=sheet_name)
-    wks1 = writer.sheets[sheet_name]  # Сохраняем в переменную вкладку для форматирования
+    # writer = pd.ExcelWriter(name_file, engine='xlsxwriter')
+    with pd.ExcelWriter(name_file, engine='xlsxwriter') as writer:
+        workbook = writer.book
+        df.to_excel(writer, index=False, sheet_name=sheet_name)
+        wks1 = writer.sheets[sheet_name]  # Сохраняем в переменную вкладку для форматирования
 
-    # Получаем словари форматов для эксель
-    header_format, con_format, border_storage_format_left, border_storage_format_right, \
-    name_format, MO_format, data_format = format_custom(workbook)
+        # Получаем словари форматов для эксель
+        header_format, con_format, border_storage_format_left, border_storage_format_right, \
+        name_format, MO_format, data_format = format_custom(workbook)
 
-    # Форматируем таблицу
-    wks1.set_default_row(12)
-    wks1.set_row(0, 40, header_format)
-    wks1.set_column('A:A', 12, name_format)
-    wks1.set_column('B:B', 32, name_format)
-    wks1.set_column('C:AA', 10, data_format)
+        for col_num, value in enumerate(df.columns.values):
+            wks1.write(0, col_num, value, header_format)
 
-    # Делаем жирным рамку между складами и форматируем колонку с МО по всем складам
-    i = 2
-    while i < col_end+1:
-        wks1.set_column(i, i, None, border_storage_format_left)
-        wks1.set_column(i+1, i+1, None, MO_format)
-        wks1.set_column(i+2, i+2, None, border_storage_format_right)
-        i += 3
+        # Форматируем таблицу
+        wks1.set_default_row(12)
+        wks1.set_row(0, 40, None)
+        wks1.set_column('A:A', 12, name_format)
+        wks1.set_column('B:B', 32, name_format)
+        wks1.set_column('C:AA', 10, data_format)
 
-    # Подставляем формулу в колонку с МО по всей компании
-    f = 2
-    while f-1 <= row_end:
-        wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>=1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
-        f += 1
+        # Делаем жирным рамку между складами и форматируем колонку с МО по всем складам
+        i = 2
+        while i < col_end+1:
+            wks1.set_column(i, i, None, border_storage_format_left)
+            wks1.set_column(i+1, i+1, None, MO_format)
+            wks1.set_column(i+2, i+2, None, border_storage_format_right)
+            i += 3
 
-    # Добавляем выделение цветом строки при МО=0 по всей компании
-    wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
-                                                   'criteria': '=AND($Y2=0,$X2<>0)',
-                                                   'format': con_format})
+        # Подставляем формулу в колонку с МО по всей компании
+        f = 2
+        while f-1 <= row_end:
+            wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>=1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
+            f += 1
 
+        # Добавляем выделение цветом строки при МО=0 по всей компании
+        wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
+                                                       'criteria': '=AND($Y2=0,$X2<>0)',
+                                                       'format': con_format})
 
-    # Добавляем фильтр в первую колонку
-    wks1.autofilter(0, 0, row_end+1, col_end)
-    wks1.set_column(col_end+1, col_end+1, None, None, {'hidden': 1})
-    writer.save() # Сохраняем файл
+        # Добавляем фильтр в первую колонку
+        wks1.autofilter(0, 0, row_end+1, col_end)
+        wks1.set_column(col_end+1, col_end+1, None, None, {'hidden': 1})
     return
+
 
 def format_custom(workbook):
     header_format = workbook.add_format({
@@ -289,13 +310,14 @@ def format_custom(workbook):
     return header_format, con_format, border_storage_format_left, border_storage_format_right, \
            name_format, MO_format, data_format
 
+
 if __name__ == '__main__':
-    salesFilelist = search_file(salesName) # запускаем функцию по поиску файлов и получаем список файлов
-    minStockFilelist = search_file(minStockName) # запускаем функцию по поиску файлов и получаем список файлов
-    df_sales = create_df (salesFilelist, salesName)
-    df_minStock = create_df (minStockFilelist, minStockName)
-    df_general = concat_df (df_sales, df_minStock)
+    salesFilelist = search_file(salesName)  # запускаем функцию по поиску файлов и получаем список файлов
+    minStockFilelist = search_file(minStockName)  # запускаем функцию по поиску файлов и получаем список файлов
+    df_sales = create_df(salesFilelist, salesName)
+    df_minStock = create_df(minStockFilelist, minStockName)
+    df_general = concat_df(df_sales, df_minStock)
     df_general['Компания MaCar МО техническое'] = df_general['Компания MaCar МО']
-    df_general = sort_df(df_general) # сортируем столбцы
+    df_general = sort_df(df_general)  # сортируем столбцы
     # df_general.to_excel ('test.xlsx')  # записываем полученные джанные в эксель.
     df_write_xlsx(df_general)
