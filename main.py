@@ -31,7 +31,7 @@ def search_file(name):
     """
     filelist = []
     for item in os.listdir(FOLDER):
-        if name in item and item.endswith('.xlsx'):  # если файл содержит name и с расширенитем .xlsx, то выполняем
+        if name in item and item.endswith('.xlsx'):  # если файл содержит name и с расширением .xlsx, то выполняем
             # Добавляем в список папку и имя файла для последующего обращения из списка
             filelist.append(FOLDER + "/" + item)
         else:
@@ -144,12 +144,12 @@ def concat_df(df1, df2):
 
 def sort_df(df):
     sort_list = ['01 Кирова продажи', '01 Кирова МО', '01 Кирова МО расчёт',
-                 '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюб. МО расчёт',
+                 '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюбитель МО расчёт',
                  '03 Интер продажи', '03 Интер МО',	'03 Интер МО расчёт',
                  '04 Победа продажи', '04 Победа МО', '04 Победа МО расчёт',
                  '08 Центр продажи', '08 Центр МО',	'08 Центр МО расчёт',
                  '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
-                 '05 Павловский продажи', '05 Павловский МО', '05 Павловский МО расчёт',
+                 '05 Павловский МО',  '05 Павловский МО расчёт',
                  'Компания MaCar продажи', 'Компания MaCar МО', 'Компания MaCar МО расчёт',
                  'Компания MaCar МО техническое']
     df = df[sort_list]
@@ -160,22 +160,25 @@ def payment(df_payment):
     df_payment = df_payment.astype('Int32')
     df_payment['Компания MaCar продажи'] = df_payment.sum(axis=1)
 
-    list_colums_payment = ['01 Кирова МО расчёт', '02 Автолюб. МО расчёт', '03 Интер МО расчёт',
-                           '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт',
-                           '05 Павловский МО расчёт']
+    list_colums_payment = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
+                           '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
 
     list_colums_sales = ['01 Кирова продажи', '02 Автолюбитель продажи', '03 Интер продажи',
-                         '04 Победа продажи', '08 Центр продажи', '09 Вокзалка продажи',
-                         '05 Павловский продажи']
+                         '04 Победа продажи', '08 Центр продажи', '09 Вокзалка продажи']
 
     for i in range(len(list_colums_payment)):
-
-        print(df_payment[list_colums_sales[i]])
-        df_payment[list_colums_payment[i]] = (df_payment[list_colums_sales[i]] / 4).apply(np.ceil)
-
-    df_payment['Компания MaCar МО расчёт'] = df_payment[list_colums_payment].sum(axis=1)
-
+        df_payment[list_colums_payment[i]] = df_payment[list_colums_sales[i]].fillna(0).apply(calc)
     return df_payment
+
+
+def calc(val, x=int(input('Введите кол-во дней анализа продаж: ')), y=int(input('Введите кол-во дней запаса: '))):
+# def calc(val, x=365, y=90):
+    quan_prod = val / x * y
+    if 0 < quan_prod < 1:
+        val = 1
+    else:
+        val = int(quan_prod)
+    return val
 
 
 def df_write_xlsx(df):
@@ -212,20 +215,30 @@ def df_write_xlsx(df):
         # Делаем жирным рамку между складами и форматируем колонку с МО по всем складам
         i = 2
         while i < col_end+1:
-            wks1.set_column(i, i, None, border_storage_format_left)
-            wks1.set_column(i+1, i+1, None, MO_format)
-            wks1.set_column(i+2, i+2, None, border_storage_format_right)
+            if i < 18:
+                wks1.set_column(i, i, None, border_storage_format_left)
+                wks1.set_column(i+1, i+1, None, MO_format)
+                wks1.set_column(i+2, i+2, None, border_storage_format_right)
+            elif 18 < i < 21:
+                wks1.set_column(i, i, None, border_storage_format_left)
+                wks1.set_column(i, i, None, MO_format)
+                # wks1.set_column(i + 2, i + 2, None, border_storage_format_right)
+            else:
+                wks1.set_column(i-1, i-1, None, border_storage_format_left)
+                wks1.set_column(i, i, None, MO_format)
+                # wks1.set_column(i + 2, i + 2, None, border_storage_format_right)
             i += 3
 
         # Подставляем формулу в колонку с МО по всей компании
         f = 2
         while f-1 <= row_end:
-            wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>=1,AA{f}=0),SUM(D{f},G{f},J{f},M{f},P{f},S{f},V{f}),AA{f})')
+            wks1.write_formula(f'X{f}', f'=IF(OR(Z{f}>=1,Z{f}=0),SUM(INT(D{f}),INT(G{f}),'
+                                        f'INT(J{f}),INT(M{f}),INT(P{f}),INT(S{f}),INT(U{f})),Z{f})')
             f += 1
 
         # Добавляем выделение цветом строки при МО=0 по всей компании
         wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
-                                                       'criteria': '=AND($Y2=0,$X2<>0)',
+                                                       'criteria': '=AND($X2=0,$W2<>0)',
                                                        'format': con_format})
 
         # Добавляем фильтр в первую колонку
@@ -311,6 +324,127 @@ def format_custom(workbook):
            name_format, MO_format, data_format
 
 
+def final_calc(row):
+    """
+    На основании данных продаж из колонки "Компания MaCar продажи" корректируем значения в колонках "... МО расчёт"
+    Так же на основании этих данных добавляем колонку "05 Павловский МО расчёт" и подставляем значения.
+    Добавляем колонку "Компания MaCar МО расчёт", которая является суммой целых чисел всех колонок с
+    наименованием "... МО расчёт"
+    Если МО на соответствующем складе > 0, но < 1, то значение в колонки "... МО расчёт" устанавливаем равное этому МО.
+    Если "Компания MaCar продажи" = 0, то устанавливаем во все колонки "... МО расчёт" = 0.5 и в колонку
+    "05 Павловский МО расчёт" = 0.5.
+    Если "Компания MaCar продажи" > 0, но < 25, то устанавливаем в колонку "05 Павловский МО расчёт" = 0.
+    Если "Компания MaCar продажи" >=25, то устанавливаем в колонку
+    "05 Павловский МО расчёт" = "Компания MaCar продажи" // 10.
+    Если "Компания MaCar продажи" = 1, то устанавливаем в колонке 02 Автолюбитель МО расчет = 1.
+    Если "Компания MaCar продажи" = 2, то устанавливаем в колонке 02 Автолюбитель МО расчет = 1.
+    В других колонках где есть 1 убираем одну ихз них.
+    Если "Компания MaCar продажи" > 0, но < 10, и значение в колонке "... МО расчёт" = 0, то устанавливаем 0.33.
+    Если "Компания MaCar продажи" >= 10, и значение в колонке "... МО расчёт" = 0, то устанавливаем 1.
+    Суммируем значения из всех колонок "... МО расчёт" и подставляем в колонку "Компания MaCar МО расчёт".
+    Если "Компания MaCar продажи" = 0, то устанавливаем "Компания MaCar МО расчёт" = 0.5.
+    Если значение в колонке "Компания MaCar МО" > 0, но < 1, то устанавливаем в колонку "Компания MaCar МО расчёт"
+    значение из колонки "Компания MaCar МО".
+
+    :param row: Series pandas
+        наименование колонок:
+        02 Автолюбитель продажи
+        08 Центр продажи
+        04 Победа продажи
+        09 Вокзалка продажи
+        01 Кирова продажи
+        03 Интер продажи
+        Компания MaCar продажи
+        01 Кирова МО расчёт
+        02 Автолюбитель МО расчёт
+        03 Интер МО расчёт
+        04 Победа МО расчёт
+        08 Центр МО расчёт
+        09 Вокзалка МО расчёт
+        05 Павловский МО
+        Компания MaCar МО
+        02 Автолюбитель МО
+        04 Победа МО
+        08 Центр МО
+        01 Кирова МО
+        03 Интер МО
+        09 Вокзалка МО
+        Компания MaCar МО техническое
+    :return: Series pandas
+        добавлено к полученным колонкам ещё две:
+        05 Павловский МО расчёт
+        Компания MaCar МО расчёт
+    """
+    list_sol = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
+                '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
+
+    if row['Компания MaCar продажи'] == 0:
+        for i in list_sol:
+            row[i] = set_value_mo(row[i[:-7]], 0.5)
+            row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], 0.5)
+    elif row['Компания MaCar продажи'] == 1:
+        if 0 < row['02 Автолюбитель МО'] < 1:
+            for i in list_sol:
+                if row[i] == 0:
+                    row[i] = set_value_mo(row[i[:-7]], 0.33)
+                else:
+                    row[i] = set_value_mo(row[i[:-7]], row[i])
+        else:
+            for i in list_sol:
+                row[i] = set_value_mo(row[i[:-7]], 0.33)
+            row['02 Автолюбитель МО расчёт'] = set_value_mo(row['02 Автолюбитель МО'], 1)
+    elif row['Компания MaCar продажи'] == 2:
+        if 0 < row['02 Автолюбитель МО'] < 1 or row['02 Автолюбитель МО расчёт'] >= 1:
+            for i in list_sol:
+                if row[i] == 0:
+                    row[i] = set_value_mo(row[i[:-7]], 0.33)
+                else:
+                    row[i] = set_value_mo(row[i[:-7]], row[i])
+        else:
+            a = 0
+            for i in reversed(list_sol):
+                if row[i] == 0:
+                    row[i] = set_value_mo(row[i[:-7]], 0.33)
+                elif row[i] > 0 and a == 0:
+                    row[i] = set_value_mo(row[i[:-7]], 0.33)
+                    a += 1
+                else:
+                    row[i] = set_value_mo(row[i[:-7]], row[i])
+            row['02 Автолюбитель МО расчёт'] = set_value_mo(row['02 Автолюбитель МО'], 1)
+
+    elif 2 < row['Компания MaCar продажи'] < 10:
+        for i in list_sol:
+            if row[i] == 0:
+                row[i] = set_value_mo(row[i[:-7]], 0.33)
+            else:
+                row[i] = set_value_mo(row[i[:-7]], row[i])
+    elif row['Компания MaCar продажи'] >= 10:
+        for i in list_sol:
+            if row[i] == 0:
+                row[i] = set_value_mo(row[i[:-7]], 1)
+            else:
+                row[i] = set_value_mo(row[i[:-7]], row[i])
+    if row['Компания MaCar продажи'] >= 25:
+        val = row['Компания MaCar продажи'] // 10
+        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], val)
+    elif row['Компания MaCar продажи'] > 0:
+        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], 0)
+
+    row['Компания MaCar МО расчёт'] = 0
+    for i in list_sol:
+        row['Компания MaCar МО расчёт'] += int(row[i])
+    row['Компания MaCar МО расчёт'] += int(row['05 Павловский МО расчёт'])
+    if row['Компания MaCar продажи'] == 0:
+        row['Компания MaCar МО расчёт'] = 0.5
+    row['Компания MaCar МО расчёт'] = set_value_mo(row['Компания MaCar МО техническое'], row['Компания MaCar МО расчёт'])
+    return row
+
+
+def set_value_mo(mo_old: float, value: float) -> float:
+    """Если mo_old от 0 до 1, то возвращаем его. В противном случае возвращаем значение value"""
+    return mo_old if 0 < mo_old < 1 else value
+
+
 if __name__ == '__main__':
     salesFilelist = search_file(salesName)  # запускаем функцию по поиску файлов и получаем список файлов
     minStockFilelist = search_file(minStockName)  # запускаем функцию по поиску файлов и получаем список файлов
@@ -318,6 +452,7 @@ if __name__ == '__main__':
     df_minStock = create_df(minStockFilelist, minStockName)
     df_general = concat_df(df_sales, df_minStock)
     df_general['Компания MaCar МО техническое'] = df_general['Компания MaCar МО']
+    df_general = df_general.fillna(0).apply(final_calc, axis=1)  # осуществляем последние расчёты по каждой строке
     df_general = sort_df(df_general)  # сортируем столбцы
-    # df_general.to_excel ('test.xlsx')  # записываем полученные джанные в эксель.
+    # df_general.to_excel ('test.xlsx')  # записываем полученные данные в эксель для тестов.
     df_write_xlsx(df_general)
