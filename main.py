@@ -1,27 +1,61 @@
 # Author Loik Andrey 7034@balancedv.ru
-# TODO
-#  Часть 1
-#  1. Создать отдельный файл программы для чтения файлов эксель. Передавать туда маску наименования файла,
-#  который требуется прочитать.
-#  Готово 2. Прочитать все файлы по продажам и объединить
-#  Готово 3. Прочитать все файлы МО и объединить.
-#  Не делаем 4. Прочитать старый итоговый файл и взять от туда старые данные по продажам
-#  5. Занести все данные в новый файл и
-#  6. найти отличия новых данных по продажам по всей компании со старыми и записать в отдельную колонку
-#  7. Отформатировать все строки, выделить те строки в которых в колонке Отличие значение не равно нулю
-#  Часть 2.
-#  8. Считать значения МО из эксель файл полученного после редактирования
-#  отвественным заказчиком итого вого файла из Части 1
-#  9. Создать файл для загрузки значений МО, которые были считаны в п.7
 
 import pandas as pd
-import numpy as np
 import os
-
 
 FOLDER = 'Исходные данные'
 salesName = 'продажи'
 minStockName = 'МО'
+DF_COMP_CRAT = pd.DataFrame()
+LIST_WH = ['01 Кирова', '02 Автолюбитель', '03 Интер', '04 Победа', '08 Центр', '09 Вокзалка']
+
+
+def input_prior_wh():
+    """Запрашиваем приоритетный склад у пользователя"""
+    print('Введите приоритетный склад из списка ' + ', '.join(LIST_WH))
+    prior = input('Если приоритетного склада нет, то нажмите Enter: ')
+
+    if prior not in LIST_WH:
+        print(f'Вы не ввели приоритетный склад, либо наименования {prior} нет в списке.')
+        prior = False
+    return prior
+
+
+def input_max_crat_comp():
+    """Запрашиваем максимальное значение кратности у пользователя"""
+    print('Введите 1, если необходимо учитывать Кратность или Комплектность')
+    crat, comp = 1, 1  # TODO Исправить на 1, 1 после тестов
+    try:
+        result = int(input('Если учитывать не нужно, то нажмите Enter: '))
+    except ValueError:
+        result = 0
+    if result:
+        try:
+            crat = int(input('Введите максимальное значение Кратности: '))
+            comp = int(input('Введите максимальное значение Комплектности: '))
+        except ValueError:
+            print('Вы ввели не корректное значение. Это должно быть целое число. Попробуйте ещё раз.')
+            input_max_crat_comp()
+    return crat, comp
+
+
+def input_day_sales_stock():
+    """Запрашиваем кол-во анализируемых дней и дней запаса"""
+    print('Введите 1, если необходимо изменить кол-во дней анализируемых продаж и дней запаса')
+    day_sales, day_stock = 365, 90
+    try:
+        result = int(input('Если используем дни по умолчанию (365 и 90), то нажмите Enter: '))
+    except ValueError:
+        result = 0
+    if result:
+        try:
+            day_sales = int(input('Введите кол-во дней анализа продаж: : '))
+            day_stock = int(input('Введите кол-во дней запаса: '))
+        except ValueError:
+            print('Вы ввели не корректное значение. Это должно быть целое число. Попробуйте ещё раз.')
+            input_day_sales_stock()
+
+    return day_sales, day_stock
 
 
 def search_file(name):
@@ -57,12 +91,15 @@ def create_df(file_list, add_name):
         mask = df_search_header.replace('.*Номенклатура.*', True, regex=True).eq(True)
         # Преобразуем Dataframe согласно маске. После обработки все значения будут NaN кроме нужного нам.
         # В этой же строке кода удаляем все строки со значением NaN и далее получаем индекс оставшейся строки
-        f = df_search_header[mask].dropna(axis=0, how='all').index.values # Удаление пустых строк
+        f = df_search_header[mask].dropna(axis=0, how='all').index.values  # Удаление пустых строк
         df = df.iloc[int(f):, :]  # Убираем все строки с верха DF до заголовков
         df = df.dropna(axis=1, how='all')  # Убираем пустые колонки
         df.iloc[0, :] = df.iloc[0, :] + ' ' + add_name  # Добавляем в наименование тип данных
-        df.iloc[0, 0] = 'Код'
-        df.iloc[0, 1] = 'Номенклатура'
+        if add_name == 'продажи':
+            df.iloc[0, :4] = ['Код', 'Комплектность', 'Кратность', 'Номенклатура']
+        else:
+            df.iloc[0, :2] = ['Код', 'Номенклатура']
+        # df.iloc[0, 1] = 'Номенклатура'
         # Значения из найденной строки переносим в заголовки DataFrame для простоты дальнейшего обращения
         df.columns = df.iloc[0].values
         df = df.iloc[2:, :]  # Убираем две строки с верха DF
@@ -83,22 +120,22 @@ def create_df(file_list, add_name):
 
 def read_excel(file_name):
     """
-    Пытаемся прочитать файл xlxs, если не получается, то исправляем ошибку и опять читаем файл
-    :param file_name: Имя файла для чтения
+    Пытаемся прочитать файл xlxs, если не получается, то исправляем ошибку и опять читаем файл.
+    :param file_name: Имя файла для чтения.
     :return: DataFrame
     """
-    print ('Попытка загрузки файла:'+file_name)
+    print('Попытка загрузки файла:' + file_name)
     try:
         if 'продажи' in file_name:
             df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
         else:
             df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=0, engine='openpyxl')
-        return (df)
+        return df
     except KeyError as Error:
-        print (Error)
+        print(Error)
         df = None
         if str(Error) == "\"There is no item named 'xl/sharedStrings.xml' in the archive\"":
-            bug_fix (file_name)
+            bug_fix(file_name)
             print('Исправлена ошибка: ', Error, f'в файле: \"{file_name}\"\n')
             if 'продажи' in file_name:
                 df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
@@ -137,7 +174,6 @@ def bug_fix(file_name):
 
 
 def concat_df(df1, df2):
-    # df = pd.concat([df1, df2], axis=1, ignore_index=False, levels=['Код'])
     df = pd.concat([df1, df2], axis=1, ignore_index=False)
     return df
 
@@ -145,11 +181,11 @@ def concat_df(df1, df2):
 def sort_df(df):
     sort_list = ['01 Кирова продажи', '01 Кирова МО', '01 Кирова МО расчёт',
                  '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюбитель МО расчёт',
-                 '03 Интер продажи', '03 Интер МО',	'03 Интер МО расчёт',
+                 '03 Интер продажи', '03 Интер МО', '03 Интер МО расчёт',
                  '04 Победа продажи', '04 Победа МО', '04 Победа МО расчёт',
-                 '08 Центр продажи', '08 Центр МО',	'08 Центр МО расчёт',
+                 '08 Центр продажи', '08 Центр МО', '08 Центр МО расчёт',
                  '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
-                 '05 Павловский МО',  '05 Павловский МО расчёт',
+                 '05 Павловский МО', '05 Павловский МО расчёт',
                  'Компания MaCar продажи', 'Компания MaCar МО', 'Компания MaCar МО расчёт',
                  'Компания MaCar МО техническое']
     df = df[sort_list]
@@ -157,28 +193,49 @@ def sort_df(df):
 
 
 def payment(df_payment):
-    df_payment = df_payment.astype('Int32')
-    df_payment['Компания MaCar продажи'] = df_payment.sum(axis=1)
+    colums_payment = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
+                      '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
 
-    list_colums_payment = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
-                           '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
+    colums_sales = '01 Кирова|02 Автолюбитель|03 Интер|04 Победа|08 Центр|09 Вокзалка'
 
-    list_colums_sales = ['01 Кирова продажи', '02 Автолюбитель продажи', '03 Интер продажи',
-                         '04 Победа продажи', '08 Центр продажи', '09 Вокзалка продажи']
+    DF_COMP_CRAT['Комплектность'] = df_payment['Комплектность'].fillna(1).max(axis=1)
+    DF_COMP_CRAT['Кратность'] = df_payment['Кратность'].fillna(1).max(axis=1)
 
-    for i in range(len(list_colums_payment)):
-        df_payment[list_colums_payment[i]] = df_payment[list_colums_sales[i]].fillna(0).apply(calc)
+    DF_COMP_CRAT['Кратность'][DF_COMP_CRAT['Кратность'] >= MAX_CRAT] = MAX_CRAT
+    DF_COMP_CRAT['Комплектность'][DF_COMP_CRAT['Комплектность'] >= MAX_COMP] = MAX_COMP
+
+    df_payment['Компания MaCar продажи'] = df_payment.filter(regex=colums_sales).sum(axis=1)
+    # df_payment.loc[df_payment['Компания MaCar продажи'] < 0, 'Компания MaCar продажи'] = 0
+
+    for i in range(len(colums_payment)):
+        # Суммируем продажи по всем складам подразделения
+        df_payment[colums_payment[i][:-10] + ' продажи'] = df_payment.filter(like=colums_payment[i][:-10]).sum(axis=1)
+
+        # Рассчитываем значения исходя из периода анализируемых продажи и периода запасов
+        df_payment[colums_payment[i]] = df_payment[colums_payment[i][:-10] + ' продажи'].fillna(0).apply(calc)
+
+        # Обнуляем все рассчитанные МО меньше 0
+        mask_lz = df_payment[colums_payment[i]] < 0
+        df_payment.loc[mask_lz, colums_payment[i]] = 0
+
+        # Приравниваем расчётные значения от 0 до 1 к значению кратности
+        mask_min_crat = (df_payment[colums_payment[i]] > 0) & (df_payment[colums_payment[i]] < 1)
+        df_payment.loc[mask_min_crat, colums_payment[i]] = DF_COMP_CRAT.loc[mask_min_crat, 'Кратность']
+
+        # Все расчётные значения устанавливаем согласно кратности
+        df_payment[colums_payment[i]] = round(df_payment[colums_payment[i]] + 0.000001 / DF_COMP_CRAT['Кратность']) * \
+                                        DF_COMP_CRAT['Кратность']
+
+        # Если есть расчётные значения больше 0 до значения Комплектности, то устанавливаем значения комплектности
+        mask_min_comp = (df_payment[colums_payment[i]] > 0) & \
+                        (df_payment[colums_payment[i]] < DF_COMP_CRAT['Комплектность'])
+        df_payment.loc[mask_min_comp, colums_payment[i]] = DF_COMP_CRAT.loc[mask_min_comp, 'Комплектность']
     return df_payment
 
 
-def calc(val, x=int(input('Введите кол-во дней анализа продаж: ')), y=int(input('Введите кол-во дней запаса: '))):
-# def calc(val, x=365, y=90):
-    quan_prod = val / x * y
-    if 0 < quan_prod < 1:
-        val = 1
-    else:
-        val = int(quan_prod)
-    return val
+def calc(val):
+    quan_prod = val / DAY_SALES * DAY_STOCK
+    return int(quan_prod) if quan_prod >= 1 else quan_prod
 
 
 def df_write_xlsx(df):
@@ -214,24 +271,24 @@ def df_write_xlsx(df):
 
         # Делаем жирным рамку между складами и форматируем колонку с МО по всем складам
         i = 2
-        while i < col_end+1:
+        while i < col_end + 1:
             if i < 18:
                 wks1.set_column(i, i, None, border_storage_format_left)
-                wks1.set_column(i+1, i+1, None, MO_format)
-                wks1.set_column(i+2, i+2, None, border_storage_format_right)
+                wks1.set_column(i + 1, i + 1, None, MO_format)
+                wks1.set_column(i + 2, i + 2, None, border_storage_format_right)
             elif 18 < i < 21:
                 wks1.set_column(i, i, None, border_storage_format_left)
                 wks1.set_column(i, i, None, MO_format)
                 # wks1.set_column(i + 2, i + 2, None, border_storage_format_right)
             else:
-                wks1.set_column(i-1, i-1, None, border_storage_format_left)
+                wks1.set_column(i - 1, i - 1, None, border_storage_format_left)
                 wks1.set_column(i, i, None, MO_format)
                 # wks1.set_column(i + 2, i + 2, None, border_storage_format_right)
             i += 3
 
         # Подставляем формулу в колонку с МО по всей компании
         f = 2
-        while f-1 <= row_end:
+        while f - 1 <= row_end:
             wks1.write_formula(f'X{f}', f'=IF(OR(Z{f}>=1,Z{f}=0),SUM(INT(D{f}),INT(G{f}),'
                                         f'INT(J{f}),INT(M{f}),INT(P{f}),INT(S{f}),INT(U{f})),Z{f})')
             f += 1
@@ -242,8 +299,8 @@ def df_write_xlsx(df):
                                                        'format': con_format})
 
         # Добавляем фильтр в первую колонку
-        wks1.autofilter(0, 0, row_end+1, col_end)
-        wks1.set_column(col_end+1, col_end+1, None, None, {'hidden': 1})
+        wks1.autofilter(0, 0, row_end + 1, col_end)
+        wks1.set_column(col_end + 1, col_end + 1, None, None, {'hidden': 1})
     return
 
 
@@ -370,69 +427,70 @@ def final_calc(row):
         01 Кирова МО
         03 Интер МО
         09 Вокзалка МО
-        Компания MaCar МО техническое
+        Компания MaCar МО техническое.
     :return: Series pandas
         добавлено к полученным колонкам ещё две:
         05 Павловский МО расчёт
         Компания MaCar МО расчёт
     """
-    list_sol = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
+    list_col = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
                 '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
+    prior_wh_mo, prior_wh_calc = None, None
+    if PRIOR_WH:
+        prior_wh_mo = PRIOR_WH + ' МО'
+        prior_wh_calc = PRIOR_WH + ' МО расчёт'
 
-    if row['Компания MaCar продажи'] == 0:
-        for i in list_sol:
+    if row['Компания MaCar продажи'] <= 0:
+        for i in list_col:
             row[i] = set_value_mo(row[i[:-7]], 0.5)
             row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], 0.5)
     elif row['Компания MaCar продажи'] == 1:
-        if 0 < row['02 Автолюбитель МО'] < 1:
-            for i in list_sol:
-                if row[i] == 0:
-                    row[i] = set_value_mo(row[i[:-7]], 0.33)
+        for i in list_col:
+            if PRIOR_WH:
+                # Устанавливаем ... МО расчёт согласно приоритетного склада
+                if 0 < row[prior_wh_mo] < 1:
+                    row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
                 else:
-                    row[i] = set_value_mo(row[i[:-7]], row[i])
-        else:
-            for i in list_sol:
-                row[i] = set_value_mo(row[i[:-7]], 0.33)
-            row['02 Автолюбитель МО расчёт'] = set_value_mo(row['02 Автолюбитель МО'], 1)
+                    row[prior_wh_calc] = \
+                        set_value_mo(row[prior_wh_mo], row[i]) if row[i] > row[prior_wh_calc] else row[prior_wh_calc]
+                    if i != prior_wh_calc:
+                        row[i] = set_value_mo(row[i[:-7]], 0.33)
+            else:
+                # Устанавливаем ... МО расчёт согласно приоритетного склада
+                row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
     elif row['Компания MaCar продажи'] == 2:
-        if 0 < row['02 Автолюбитель МО'] < 1 or row['02 Автолюбитель МО расчёт'] >= 1:
-            for i in list_sol:
-                if row[i] == 0:
-                    row[i] = set_value_mo(row[i[:-7]], 0.33)
-                else:
-                    row[i] = set_value_mo(row[i[:-7]], row[i])
-        else:
-            list_sol = ['02 Автолюбитель МО расчёт', '01 Кирова МО расчёт', '03 Интер МО расчёт',
-                        '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
-            a = 0
-            for i in list_sol:
-
-                if row[i] == 0:
-                    row[i] = set_value_mo(row[i[:-7]], 0.33)
-                elif row[i] == 1 and a == 0:
-                    row[i] = set_value_mo(row[i[:-7]], 1)
-                    if row[i] == 1:
-                        a += 1
+        if PRIOR_WH:
+            if 0 < row[prior_wh_mo] < 1 or row[prior_wh_calc] >= 1:
+                for i in list_col:
+                    row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
+            else:
+                # Переставляем приоритетный склад вперёд списка и переворачиваем остальной список
+                list_col1 = [prior_wh_calc] + [col for col in reversed(list_col) if col != prior_wh_calc]
+                first_pass = True
+                for i in list_col1:
+                    if row[i[:-9] + 'продажи'] == 0:
+                        row[i] = set_value_mo(row[i[:-7]], 0.33)
+                    elif row[i[:-9] + 'продажи'] == 1 and first_pass:
+                        if row[i[:-7]] >= 1 or row[i[:-7]] == 0:
+                            row[prior_wh_calc] = set_value_mo(row[prior_wh_mo], row[i])
+                            row[i] = set_value_mo(row[i[:-7]], 0.33)
+                            first_pass = False
+                        else:
+                            row[i] = set_value_mo(row[i[:-7]], row[i])
                     else:
-                        row['02 Автолюбитель МО расчёт'] = set_value_mo(row['02 Автолюбитель МО'], 1)
-                elif row[i] == 1 and a == 1:
-                    row[i] = set_value_mo(row[i[:-7]], 0.33)
-                    row['02 Автолюбитель МО расчёт'] = set_value_mo(row['02 Автолюбитель МО'], 1)
-                else:
-                    row[i] = set_value_mo(row[i[:-7]], row[i])
+                        row[i] = set_value_mo(row[i[:-7]], row[i])
+        else:
+            for i in list_col:
+                row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
 
     elif 2 < row['Компания MaCar продажи'] < 10:
-        for i in list_sol:
-            if row[i] == 0:
-                row[i] = set_value_mo(row[i[:-7]], 0.33)
-            else:
-                row[i] = set_value_mo(row[i[:-7]], row[i])
+        for i in list_col:
+            row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
     elif row['Компания MaCar продажи'] >= 10:
-        for i in list_sol:
-            if row[i] == 0:
-                row[i] = set_value_mo(row[i[:-7]], 1)
-            else:
-                row[i] = set_value_mo(row[i[:-7]], row[i])
+        for i in list_col:
+            val_default = row[['Комплектность', 'Кратность']].max()
+            row[i] = set_value_mo(row[i[:-7]], val_default if row[i] == 0 else row[i])
+
     if row['Компания MaCar продажи'] >= 25:
         val = row['Компания MaCar продажи'] // 10
         row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], val)
@@ -440,12 +498,13 @@ def final_calc(row):
         row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], 0)
 
     row['Компания MaCar МО расчёт'] = 0
-    for i in list_sol:
+    for i in list_col:
         row['Компания MaCar МО расчёт'] += int(row[i])
     row['Компания MaCar МО расчёт'] += int(row['05 Павловский МО расчёт'])
     if row['Компания MaCar продажи'] == 0:
         row['Компания MaCar МО расчёт'] = 0.5
-    row['Компания MaCar МО расчёт'] = set_value_mo(row['Компания MaCar МО техническое'], row['Компания MaCar МО расчёт'])
+    row['Компания MaCar МО расчёт'] = set_value_mo(row['Компания MaCar МО техническое'],
+                                                   row['Компания MaCar МО расчёт'])
     return row
 
 
@@ -454,14 +513,32 @@ def set_value_mo(mo_old: float, value: float) -> float:
     return mo_old if 0 < mo_old < 1 else value
 
 
+def create_final_df(df1: object, df2: object):
+    """Создаём финальный DataFrame
+    :param df1:
+    :param df2:
+
+    """
+    df_final = concat_df(df1, df2)
+    df_final.drop(columns=['Комплектность', 'Кратность'], inplace=True)
+    df_final['Компания MaCar МО техническое'] = df_final['Компания MaCar МО']
+    df_final = concat_df(df_final, DF_COMP_CRAT)
+    df_final[['Комплектность', 'Кратность']] = df_final[['Комплектность', 'Кратность']].fillna(1)
+    df_final = df_final.fillna(0).apply(final_calc, axis=1)  # осуществляем последние расчёты по каждой строке
+    df_final = sort_df(df_final)  # сортируем столбцы
+    return df_final
+
+
 if __name__ == '__main__':
-    salesFilelist = search_file(salesName)  # запускаем функцию по поиску файлов и получаем список файлов
-    minStockFilelist = search_file(minStockName)  # запускаем функцию по поиску файлов и получаем список файлов
+    MAX_CRAT, MAX_COMP = input_max_crat_comp()  # Задаём максимальное значение Кратности и Комплектности
+    PRIOR_WH = input_prior_wh()  # Задаём приоритетный склад
+    DAY_SALES, DAY_STOCK = input_day_sales_stock()  # Задаём кол-во дней для расчётов
+    salesFilelist = search_file(salesName)  # Запускаем функцию по поиску файлов и получаем список файлов
+    minStockFilelist = search_file(minStockName)  # Запускаем функцию по поиску файлов и получаем список файлов
     df_sales = create_df(salesFilelist, salesName)
+
     df_minStock = create_df(minStockFilelist, minStockName)
-    df_general = concat_df(df_sales, df_minStock)
-    df_general['Компания MaCar МО техническое'] = df_general['Компания MaCar МО']
-    df_general = df_general.fillna(0).apply(final_calc, axis=1)  # осуществляем последние расчёты по каждой строке
-    df_general = sort_df(df_general)  # сортируем столбцы
-    # df_general.to_excel ('test.xlsx')  # записываем полученные данные в эксель для тестов.
+
+    df_general = create_final_df(df_sales, df_minStock)
+    # df_general.to_excel ('test.xlsx')  # Записываем полученные данные в эксель для тестов.
     df_write_xlsx(df_general)
