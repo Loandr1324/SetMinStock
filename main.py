@@ -8,6 +8,7 @@ salesName = 'продажи'
 minStockName = 'МО'
 DF_COMP_CRAT = pd.DataFrame()
 LIST_WH = ['01 Кирова', '02 Автолюбитель', '03 Интер', '04 Победа', '08 Центр', '09 Вокзалка']
+CONST_CRAT = False
 
 
 def input_prior_wh():
@@ -24,18 +25,29 @@ def input_prior_wh():
 def input_max_crat_comp():
     """Запрашиваем максимальное значение кратности у пользователя"""
     print('Введите 1, если необходимо учитывать Кратность или Комплектность')
-    crat, comp = 1, 1  # TODO Исправить на 1, 1 после тестов
+    crat, comp = 1, 1
     try:
         result = int(input('Если учитывать не нужно, то нажмите Enter: '))
     except ValueError:
         result = 0
-    if result:
-        try:
+
+    try:
+        if result:
+            print('Установите режим работы с Кратностью и Комплекностью.')
+            print('1 - Присваиваем значение кратности программой. Комплектность не учитываем.')
+            print('2 - Ограничиваем максимальное значение Кратности и Комплектности.')
+            result = int(input('Введите вариант: '))
+        if result == 1:
+            print('Вы выбрали режим установки кратности программой.')
+            global CONST_CRAT
+            CONST_CRAT = int(input('Введите значение Кратности: '))
+            crat = CONST_CRAT
+        elif result == 2:
             crat = int(input('Введите максимальное значение Кратности: '))
             comp = int(input('Введите максимальное значение Комплектности: '))
-        except ValueError:
-            print('Вы ввели не корректное значение. Это должно быть целое число. Попробуйте ещё раз.')
-            input_max_crat_comp()
+    except ValueError:
+        print('Вы ввели не корректное значение. Это должно быть целое число. Попробуйте ещё раз.')
+        input_max_crat_comp()
     return crat, comp
 
 
@@ -201,7 +213,11 @@ def payment(df_payment):
     DF_COMP_CRAT['Комплектность'] = df_payment['Комплектность'].fillna(1).max(axis=1)
     DF_COMP_CRAT['Кратность'] = df_payment['Кратность'].fillna(1).max(axis=1)
 
-    DF_COMP_CRAT['Кратность'][DF_COMP_CRAT['Кратность'] >= MAX_CRAT] = MAX_CRAT
+    if CONST_CRAT:
+        print(f'Устанавливаем значение кратности равное {CONST_CRAT}')
+        DF_COMP_CRAT['Кратность'] = CONST_CRAT
+    else:
+        DF_COMP_CRAT['Кратность'][DF_COMP_CRAT['Кратность'] >= MAX_CRAT] = MAX_CRAT
     DF_COMP_CRAT['Комплектность'][DF_COMP_CRAT['Комплектность'] >= MAX_COMP] = MAX_COMP
 
     df_payment['Компания MaCar продажи'] = df_payment.filter(regex=colums_sales).sum(axis=1)
@@ -223,8 +239,9 @@ def payment(df_payment):
         df_payment.loc[mask_min_crat, colums_payment[i]] = DF_COMP_CRAT.loc[mask_min_crat, 'Кратность']
 
         # Все расчётные значения устанавливаем согласно кратности
-        df_payment[colums_payment[i]] = round(df_payment[colums_payment[i]] + 0.000001 / DF_COMP_CRAT['Кратность']) * \
-                                        DF_COMP_CRAT['Кратность']
+        df_payment[colums_payment[i]] = round(
+            (df_payment[colums_payment[i]] + 0.000001) / DF_COMP_CRAT['Кратность']
+        ) * DF_COMP_CRAT['Кратность']
 
         # Если есть расчётные значения больше 0 до значения Комплектности, то устанавливаем значения комплектности
         mask_min_comp = (df_payment[colums_payment[i]] > 0) & \
@@ -257,7 +274,7 @@ def df_write_xlsx(df):
 
         # Получаем словари форматов для эксель
         header_format, con_format, border_storage_format_left, border_storage_format_right, \
-        name_format, MO_format, data_format = format_custom(workbook)
+            name_format, MO_format, data_format = format_custom(workbook)
 
         for col_num, value in enumerate(df.columns.values):
             wks1.write(0, col_num, value, header_format)
@@ -378,7 +395,7 @@ def format_custom(workbook):
     })
 
     return header_format, con_format, border_storage_format_left, border_storage_format_right, \
-           name_format, MO_format, data_format
+        name_format, MO_format, data_format
 
 
 def final_calc(row):
