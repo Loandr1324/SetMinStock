@@ -239,7 +239,6 @@ def payment(df_payment):
 
     if USE_OPT_STORE:
         columns_payment += ['05 Павловский МО расчёт']
-        retail_columns_sales = columns_sales
         columns_sales += '|05 Павловский'
 
     DF_COMP_CRAT['Комплектность'] = df_payment['Комплектность'].fillna(1).max(axis=1)
@@ -300,7 +299,7 @@ def df_write_xlsx(df):
     # Для простоты форматирования переводим индекс колонки
     df.reset_index(inplace=True)
 
-    # Создаём эксельи сохраняем данные
+    # Создаём эксель и сохраняем данные
     name_file = 'Анализ МО по компании.xlsx'
     sheet_name = 'Данные'  # Наименование вкладки для сводной таблицы
     # writer = pd.ExcelWriter(name_file, engine='xlsxwriter')
@@ -348,14 +347,23 @@ def df_write_xlsx(df):
         # Подставляем формулу в колонку с МО по всей компании
         f = 2
         while f - 1 <= row_end:
-            wks1.write_formula(f'X{f}', f'=IF(OR(Z{f}>=1,Z{f}=0),SUM(INT(D{f}),INT(G{f}),'
-                                        f'INT(J{f}),INT(M{f}),INT(P{f}),INT(S{f}),INT(U{f})),Z{f})')
+            if USE_OPT_STORE:
+                wks1.write_formula(f'Y{f}', f'=IF(OR(AA{f}>=1,AA{f}=0),SUM(INT(D{f}),INT(G{f}),'
+                                            f'INT(J{f}),INT(M{f}),INT(P{f}),INT(S{f}),INT(V{f})),AA{f})')
+            else:
+                wks1.write_formula(f'X{f}', f'=IF(OR(Z{f}>=1,Z{f}=0),SUM(INT(D{f}),INT(G{f}),'
+                                            f'INT(J{f}),INT(M{f}),INT(P{f}),INT(S{f}),INT(U{f})),Z{f})')
             f += 1
 
         # Добавляем выделение цветом строки при МО=0 по всей компании
-        wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
-                                                       'criteria': '=AND($X2=0,$W2<>0)',
-                                                       'format': con_format})
+        if USE_OPT_STORE:
+            wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
+                                                           'criteria': '=AND($Y2=0,$X2<>0)',
+                                                           'format': con_format})
+        else:
+            wks1.conditional_format(f'A2:Z{row_end_str}', {'type': 'formula',
+                                                           'criteria': '=AND($X2=0,$W2<>0)',
+                                                           'format': con_format})
 
         # Добавляем фильтр в первую колонку
         wks1.autofilter(0, 0, row_end + 1, col_end)
@@ -551,20 +559,20 @@ def final_calc(row):
 
     if not USE_OPT_STORE:
         row['05 Павловский МО расчёт'] = 0
+
     if row['Компания MaCar продажи'] <= 0:
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], 0.5)
+        row['05 Павловский МО расчёт'] = 0.5
     elif row['Компания MaCar продажи'] >= 25:
         val = row['Компания MaCar продажи'] // 10
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'],
-                                                      val + int(row['05 Павловский МО расчёт']))
+        row['05 Павловский МО расчёт'] = val + row['05 Павловский МО расчёт']
     elif row['Компания MaCar продажи'] > 0:
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], 0 + int(row['05 Павловский МО расчёт']))
+        row['05 Павловский МО расчёт'] = 0 + row['05 Павловский МО расчёт']
 
     # Приводим рассчитанные значение в колонке '05 Павловский МО расчёт' к значению Кратности или Комплектности
-    if (row['05 Павловский МО расчёт'] >= 1) & (row['05 Павловский МО расчёт'] < row['Кратность']):
+    if (row['05 Павловский МО расчёт'] > 0) & (row['05 Павловский МО расчёт'] < row['Кратность']):
         row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], row['Кратность'])
 
-    if (row['05 Павловский МО расчёт'] >= 1) & (row['05 Павловский МО расчёт'] < row['Комплектность']):
+    if (row['05 Павловский МО расчёт'] > 0) & (row['05 Павловский МО расчёт'] < row['Комплектность']):
         row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], row['Комплектность'])
 
     if row['05 Павловский МО расчёт'] > row['Комплектность']:
@@ -572,6 +580,8 @@ def final_calc(row):
             (row['05 Павловский МО расчёт'] + 0.000001) / row['Кратность']
         ) * row['Кратность']
         row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], opt_val)
+
+    row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], row['05 Павловский МО расчёт'])
 
     row['Компания MaCar МО расчёт'] = 0
     for i in list_col:
