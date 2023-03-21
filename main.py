@@ -92,7 +92,7 @@ def search_file(name):
     for item in os.listdir(FOLDER):
         condition_opt = True
         if not USE_OPT_STORE and name == 'продажи':
-            condition_opt = 'техснаб' not in item.lower()
+            condition_opt = 'техснаб' not in item.lower() and 'новотрейд' not in item.lower()
         # если файл содержит name и с расширением .xlsx, то выполняем
         if name in item and item.endswith('.xlsx') and condition_opt:
             # Добавляем в список папку и имя файла для последующего обращения из списка
