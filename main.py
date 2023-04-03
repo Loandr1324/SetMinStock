@@ -83,6 +83,43 @@ def input_use_opt_store():
     return use_opt_store
 
 
+def input_value_add_prior_wh():
+    """Запрашиваем необходимость добавления приоритетных складов у пользователя и их наименования"""
+
+    print('Введите значение Розничных продаж, при котором необходимо добавлять приоритетные склады')
+    value_add_prior_wh = input('Если дополнительные приоритетные склады не нужны, то нажмите Enter: ')
+
+    if value_add_prior_wh:
+        try:
+            value_add_prior_wh = int(value_add_prior_wh)
+        except ValueError:
+            print('Вы ввели не корректное значение. Это должно быть целое число. Попробуйте ещё раз.')
+            input_value_add_prior_wh()
+
+        print(LIST_WH)
+        # Удаляем приоритетный склад из списка возможных дополнительных приоритетных складов
+        list_wh = LIST_WH.copy()
+        if PRIOR_WH:
+            list_wh.remove(PRIOR_WH)
+        print(LIST_WH)
+        print(list_wh)
+
+        print(f'Включен режим добавления приоритетных складов при Розничных продажах больше {value_add_prior_wh}')
+        print('Список возможных значений дополнительных приоритетных складов: ' + ', '.join(list_wh))
+        list_add_prior_wh = input(f'Введите через запятую наименования приоритетных складов: ')
+        list_add_prior_wh = list_add_prior_wh.split(',')
+        correct_list_add_prior_wh = [item for item in list_add_prior_wh if item in list_wh]
+        if len(correct_list_add_prior_wh) == 0:
+            print('Вы не ввели приоритетные склады, либо наименования нет в списке. Попробуйте ещё раз.')
+            input_value_add_prior_wh()
+        else:
+            print(f'Добавлены дополнительные приоритетные склады: {correct_list_add_prior_wh}')
+    else:
+        value_add_prior_wh = 0
+        correct_list_add_prior_wh = []
+    return value_add_prior_wh, correct_list_add_prior_wh
+
+
 def search_file(name):
     """
     :param name: Поиск всех файлов в папке FOLDER, в наименовании которых, содержится name
@@ -98,6 +135,23 @@ def search_file(name):
             # Добавляем в список папку и имя файла для последующего обращения из списка
             filelist.append(FOLDER + "/" + item)
     return filelist
+
+
+def create_filelist_one_tow_year(filelist: list) -> tuple:
+    """Получаем на вход список с наименованием файлов и возвращаем на два списка."""
+
+    # filelist_one = []
+    # filelist_two = []
+    print(filelist)
+
+    filelist_one = [file for file in filelist if "1 год" in file]
+    filelist_two = [file for file in filelist if "2 года" in file]
+    # for file in filelist:
+    #     # print(file)
+    #     filelist_one = file if "1 год" in file else []
+    #     filelist_two = file if "2 года" in file else []
+
+    return filelist_one, filelist_two
 
 
 def create_df(file_list, add_name):
@@ -123,6 +177,7 @@ def create_df(file_list, add_name):
         df = df.dropna(axis=1, how='all')  # Убираем пустые колонки
         df.iloc[0, :] = df.iloc[0, :] + ' ' + add_name  # Добавляем в наименование тип данных
         if add_name == 'продажи':
+            df.iloc[0, :] = df.iloc[0, :] + '1'
             df.iloc[0, :4] = ['Код', 'Комплектность', 'Кратность', 'Номенклатура']
         else:
             df.iloc[0, :2] = ['Код', 'Номенклатура']
@@ -140,8 +195,8 @@ def create_df(file_list, add_name):
         else:
             df_result = concat_df(df_result, df)
     # Добавляем в результирующий DF по продажам расчётные данные
-    if add_name == 'продажи':
-        df_result = payment(df_result)
+    # if add_name == 'продажи':
+    #     df_result = payment(df_result)
     return df_result
 
 
@@ -201,7 +256,12 @@ def bug_fix(file_name):
 
 
 def concat_df(df1, df2):
+    df1 = df1.reset_index(inplace=True, level=['Номенклатура'])
+    df2 = df2.reset_index(level=['Номенклатура'])
+    df2 = df2.drop(['Номенклатура'], axis=1)
     df = pd.concat([df1, df2], axis=1, ignore_index=False)
+    df.reset_index(inplace=True)
+    df.set_index(['Код', 'Номенклатура'], inplace=True)
     return df
 
 
@@ -213,8 +273,9 @@ def sort_df(df):
                  '08 Центр продажи', '08 Центр МО', '08 Центр МО расчёт',
                  '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
                  '05 Павловский МО', '05 Павловский МО расчёт',
-                 'Розн. продажи MaCar', 'Компания MaCar МО', 'Компания MaCar МО расчёт',
-                 'Компания MaCar МО техническое']
+                 'Розн. продажи MaCar', 'Продажи MaCar за 2 года', 'Компания MaCar МО',
+                 # 'Розн. продажи MaCar', 'Компания MaCar МО',
+                 'Компания MaCar МО расчёт', 'Компания MaCar МО техническое']
     if USE_OPT_STORE:
         sort_list = ['01 Кирова продажи', '01 Кирова МО', '01 Кирова МО расчёт',
                  '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюбитель МО расчёт',
@@ -223,8 +284,9 @@ def sort_df(df):
                  '08 Центр продажи', '08 Центр МО', '08 Центр МО расчёт',
                  '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
                  '05 Павловский продажи', '05 Павловский МО', '05 Павловский МО расчёт',
-                 'Розн. продажи MaCar', 'Компания MaCar МО', 'Компания MaCar МО расчёт',
-                 'Компания MaCar МО техническое']
+                 'Розн. продажи MaCar', 'Продажи MaCar за 2 года', 'Компания MaCar МО',
+                 # 'Розн. продажи MaCar', 'Компания MaCar МО',
+                 'Компания MaCar МО расчёт', 'Компания MaCar МО техническое']
     df = df[sort_list]
     return df
 
@@ -235,11 +297,11 @@ def payment(df_payment):
     columns_payment = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
                        '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
 
-    columns_sales = '01 Кирова|02 Автолюбитель|03 Интер|04 Победа|08 Центр|09 Вокзалка'
+    # columns_sales = '01 Кирова|02 Автолюбитель|03 Интер|04 Победа|08 Центр|09 Вокзалка'
 
     if USE_OPT_STORE:
         columns_payment += ['05 Павловский МО расчёт']
-        columns_sales += '|05 Павловский'
+        # columns_sales += '|05 Павловский'
 
     DF_COMP_CRAT['Комплектность'] = df_payment['Комплектность'].fillna(1).max(axis=1)
     DF_COMP_CRAT['Кратность'] = df_payment['Кратность'].fillna(1).max(axis=1)
@@ -251,10 +313,11 @@ def payment(df_payment):
         DF_COMP_CRAT['Кратность'][DF_COMP_CRAT['Кратность'] >= MAX_CRAT] = MAX_CRAT
     DF_COMP_CRAT['Комплектность'][DF_COMP_CRAT['Комплектность'] >= MAX_COMP] = MAX_COMP
 
-    if USE_OPT_STORE:
-        df_payment['Розн. продажи MaCar'] = df_payment.filter(regex=columns_sales[:-14]).sum(axis=1)
-    else:
-        df_payment['Розн. продажи MaCar'] = df_payment.filter(regex=columns_sales).sum(axis=1)
+    df_payment = sum_retail_sales(df_payment)
+    # if USE_OPT_STORE:
+    #     df_payment['Розн. продажи MaCar'] = df_payment.filter(regex=columns_sales[:-14]).sum(axis=1)
+    # else:
+    #     df_payment['Розн. продажи MaCar'] = df_payment.filter(regex=columns_sales).sum(axis=1)
 
     for i in range(len(columns_payment)):
         # Суммируем продажи по всем складам подразделения
@@ -283,6 +346,14 @@ def payment(df_payment):
                 (df_payment.loc[~mask_min_comp, columns_payment[i]] + 0.000001) /
                 DF_COMP_CRAT.loc[~mask_min_comp, 'Кратность']) * DF_COMP_CRAT.loc[~mask_min_comp, 'Кратность']
     return df_payment
+
+
+def sum_retail_sales(df, name='Розн. продажи MaCar'):
+    """Суммируем продажи по всем розничным складам"""
+    columns_sales = '01 Кирова|02 Автолюбитель|03 Интер|04 Победа|08 Центр|09 Вокзалка'
+    df[name] = df.filter(regex=columns_sales).sum(axis=1)
+
+    return df
 
 
 def calc(val):
@@ -507,54 +578,55 @@ def final_calc(row):
         prior_wh_calc = PRIOR_WH + ' МО расчёт'
 
     if row['Розн. продажи MaCar'] <= 0:
-        for i in list_col:
-            row[i] = set_value_mo(row[i[:-7]], 0.5)
+        if row['Продажи MaCar за 2 года'] <= 0:
+            for i in list_col:
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.8)
+        else:
+            for i in list_col:
+                row[i] = set_value_mo_0_1(row[i[:-7]], 0.91)
     elif row['Розн. продажи MaCar'] == 1:
         for i in list_col:
-            if PRIOR_WH:
+            if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
                 # Устанавливаем ... МО расчёт согласно приоритетного склада
-                if 0 < row[prior_wh_mo] < 1:
-                    row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
-                else:
-                    row[prior_wh_calc] = \
-                        set_value_mo(row[prior_wh_mo], row[i]) if row[i] > row[prior_wh_calc] else row[prior_wh_calc]
-                    if i != prior_wh_calc:
-                        row[i] = set_value_mo(row[i[:-7]], 0.33)
+                row[prior_wh_calc] = \
+                    set_value_mo_0_9(row[prior_wh_mo], row[i] if row[i] > row[prior_wh_calc] else row[prior_wh_calc])
+                if i != prior_wh_calc:
+                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] <= 0 else 0.93)
             else:
                 # Устанавливаем ... МО расчёт согласно приоритетного склада
-                row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i])
     elif row['Розн. продажи MaCar'] == 2:
         if PRIOR_WH:
             if 0 < row[prior_wh_mo] < 1 or row[prior_wh_calc] >= 1:
                 for i in list_col:
-                    row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
+                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i])
             else:
                 # Переставляем приоритетный склад вперёд списка и переворачиваем остальной список
                 list_col1 = [prior_wh_calc] + [col for col in reversed(list_col) if col != prior_wh_calc]
                 first_pass = True
                 for i in list_col1:
                     if row[i[:-9] + 'продажи'] == 0:
-                        row[i] = set_value_mo(row[i[:-7]], 0.33)
+                        row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
                     elif row[i[:-9] + 'продажи'] == 1 and first_pass:
                         if row[i[:-7]] >= 1 or row[i[:-7]] == 0:
-                            row[prior_wh_calc] = set_value_mo(row[prior_wh_mo], row[i])
-                            row[i] = set_value_mo(row[i[:-7]], 0.33)
+                            row[prior_wh_calc] = set_value_mo_0_9(row[prior_wh_mo], row[i])
+                            row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
                             first_pass = False
                         else:
-                            row[i] = set_value_mo(row[i[:-7]], row[i])
+                            row[i] = set_value_mo_0_9(row[i[:-7]], row[i])
                     else:
-                        row[i] = set_value_mo(row[i[:-7]], row[i])
+                        row[i] = set_value_mo_0_9(row[i[:-7]], row[i])
         else:
             for i in list_col:
-                row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i])
 
     elif 2 < row['Розн. продажи MaCar'] < 10:
         for i in list_col:
-            row[i] = set_value_mo(row[i[:-7]], 0.33 if row[i] == 0 else row[i])
+            row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i])
     elif row['Розн. продажи MaCar'] >= 10:
         for i in list_col:
             val_default = row[['Комплектность', 'Кратность']].max()
-            row[i] = set_value_mo(row[i[:-7]], val_default if row[i] == 0 else row[i])
+            row[i] = set_value_mo_0_9(row[i[:-7]], val_default if row[i] == 0 else row[i])
 
     if not USE_OPT_STORE:
         row['05 Павловский МО расчёт'] = 0
@@ -567,21 +639,21 @@ def final_calc(row):
 
     # Приводим рассчитанные значение в колонке '05 Павловский МО расчёт' к значению Кратности или Комплектности
     if (row['05 Павловский МО расчёт'] > 0) & (row['05 Павловский МО расчёт'] < row['Кратность']):
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], row['Кратность'])
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], row['Кратность'])
 
     if (row['05 Павловский МО расчёт'] > 0) & (row['05 Павловский МО расчёт'] < row['Комплектность']):
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], row['Комплектность'])
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], row['Комплектность'])
 
     if row['05 Павловский МО расчёт'] > row['Комплектность']:
         opt_val = round(
             (row['05 Павловский МО расчёт'] + 0.000001) / row['Кратность']
         ) * row['Кратность']
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], opt_val)
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], opt_val)
 
     if row['Розн. продажи MaCar'] <= 0:
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], 0.5)
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], 0.5)
     else:
-        row['05 Павловский МО расчёт'] = set_value_mo(row['05 Павловский МО'], row['05 Павловский МО расчёт'])
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], row['05 Павловский МО расчёт'])
 
     row['Компания MaCar МО расчёт'] = 0
     for i in list_col:
@@ -589,37 +661,48 @@ def final_calc(row):
     row['Компания MaCar МО расчёт'] += int(row['05 Павловский МО расчёт'])
     if row['Розн. продажи MaCar'] == 0:
         row['Компания MaCar МО расчёт'] = 0.5
-    row['Компания MaCar МО расчёт'] = set_value_mo(row['Компания MaCar МО техническое'],
-                                                   row['Компания MaCar МО расчёт'])
+    row['Компания MaCar МО расчёт'] = set_value_mo_0_9(row['Компания MaCar МО техническое'],
+                                                       row['Компания MaCar МО расчёт'])
     return row
 
 
-def set_value_mo(mo_old: float, value: float) -> float:
+def set_value_mo_0_9(mo_old: float, value: float) -> float:
     """Если mo_old от 0 до 1, то возвращаем его. В противном случае возвращаем значение value"""
-    return mo_old if 0 < mo_old < 1 else value
+    return mo_old if 0 < mo_old < 0.9 else value
 
 
-def create_final_df(df1: object, df2: object):
+def set_value_mo_0_1(mo_old: float, value: float) -> float:
+    """Если mo_old от 0 до 1, то возвращаем его. Если 0, то возвращаем value.
+    В противном случае возвращаем 1"""
+    if mo_old == 0:
+        mo_new = value
+    elif 0 < mo_old < 1:
+        mo_new = mo_old
+    else:
+        mo_new = 1
+
+    return mo_new
+
+
+def create_final_df(df1: object, df2: object, df3: object):
     """Создаём финальный DataFrame
     :param df1:
     :param df2:
+    :param df3:
 
     """
     df_final = concat_df(df1, df2)
     df_final.drop(columns=['Комплектность', 'Кратность'], inplace=True)
     df_final['Компания MaCar МО техническое'] = df_final['Компания MaCar МО']
     df_final = concat_df(df_final, DF_COMP_CRAT)
+    df_final = concat_df(df_final, df3)
     df_final[['Комплектность', 'Кратность']] = df_final[['Комплектность', 'Кратность']].fillna(1)
     df_final = df_final.fillna(0).apply(final_calc, axis=1)  # осуществляем последние расчёты по каждой строке
     df_final = sort_df(df_final)  # сортируем столбцы
     return df_final
 
 
-if __name__ == '__main__':
-    MAX_CRAT, MAX_COMP, CONST_CRAT = input_max_crat_comp()  # Задаём максимальное значение Кратности и Комплектности
-    PRIOR_WH = input_prior_wh()  # Задаём приоритетный склад
-    DAY_SALES, DAY_STOCK = input_day_sales_stock()  # Задаём кол-во дней для расчётов
-    USE_OPT_STORE = input_use_opt_store()  # Задаём использование оптового склада
+def run():
     salesFilelist = search_file(salesName)  # Запускаем функцию по поиску файлов и получаем список файлов
     minStockFilelist = search_file(minStockName)  # Запускаем функцию по поиску файлов и получаем список файлов
     df_sales = create_df(salesFilelist, salesName)
@@ -629,3 +712,58 @@ if __name__ == '__main__':
     df_general = create_final_df(df_sales, df_minStock)
     # df_general.to_excel ('test.xlsx')  # Записываем полученные данные в эксель для тестов.
     df_write_xlsx(df_general)
+
+
+def new_run():
+    sales_filelist = search_file(salesName)  # Запускаем функцию по поиску файлов и получаем список файлов
+    minStockFilelist = search_file(minStockName)  # Запускаем функцию по поиску файлов и получаем список файлов
+    sales_filelist_one_year, sales_filelist_two_year = create_filelist_one_tow_year(sales_filelist)
+
+    df_sales = create_df(sales_filelist_one_year, salesName)
+    df_sales = payment(df_sales)
+
+    df_minStock = create_df(minStockFilelist, minStockName)
+
+    df_general = create_final_df(df_sales, df_minStock)
+    # df_general.to_excel ('test.xlsx')  # Записываем полученные данные в эксель для тестов.
+    df_write_xlsx(df_general)
+
+
+def run_test():
+    sales_filelist = search_file(salesName)  # Запускаем функцию по поиску файлов и получаем список файлов
+    minstock_filelist = search_file(minStockName)  # Запускаем функцию по поиску файлов и получаем список файлов
+
+    # Разделяем файлы на два списка: один год и два года
+    sales_filelist_one_year, sales_filelist_two_year = create_filelist_one_tow_year(sales_filelist)
+
+    # Создаём DataFrame с продажами за 2 года
+    df_sales_two_year = create_df(sales_filelist_two_year, salesName)
+    # Суммируем продажи за 2 года
+    df_sales_two_year = sum_retail_sales(df_sales_two_year, name='Продажи MaCar за 2 года')
+    df_sales_two_year = df_sales_two_year['Продажи MaCar за 2 года']
+
+    # Создаём DataFrame с продажами за 1 год
+    df_sales_one_year = create_df(sales_filelist_one_year, salesName)
+    # Расчитываем значения МО расчет с учётом Кратности и Комплектности
+    df_sales_one_year = payment(df_sales_one_year)
+
+    # Создаём DataFrame с минимальными остатками
+    df_minstock = create_df(minstock_filelist, minStockName)
+
+    # Создаём конечный DataFrame
+    df_general = create_final_df(df_minstock, df_sales_one_year, df_sales_two_year)
+
+    # df_general_one_year.to_excel('test_one_year.xlsx')
+    # df_sales_two_year.to_excel('test_two_year.xlsx')
+    df_general.to_excel('test.xlsx')
+
+
+if __name__ == '__main__':
+    MAX_CRAT, MAX_COMP, CONST_CRAT = input_max_crat_comp()  # Задаём максимальное значение Кратности и Комплектности
+    PRIOR_WH = input_prior_wh()  # Задаём приоритетный склад
+    DAY_SALES, DAY_STOCK = input_day_sales_stock()  # Задаём кол-во дней для расчётов
+    USE_OPT_STORE = input_use_opt_store()  # Задаём использование оптового склада
+    VALUE_ADD_PRIOR_WH, LIST_ADD_PRIOR_WH = input_value_add_prior_wh()
+    df_sales_two_year = pd.DataFrame()
+    run_test()
+    # new_run()
