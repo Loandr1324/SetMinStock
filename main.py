@@ -8,6 +8,8 @@ FOLDER = 'Исходные данные'
 salesName = 'продажи'
 minStockName = 'МО'
 DF_COMP_CRAT = pd.DataFrame()
+PERIOD_LONG = '1 год'
+PERIOD_SHOT = '3 мес'
 
 
 def input_list_wh():
@@ -25,14 +27,15 @@ def input_list_wh():
     print(f'По умолчанию список складов расположен по следующему порядку: {list_wh}.')
     print('Изменить список можно, введя через запятую номера складов. Например: 8, 3, 2, 9, 1, 4')
     list_key = input('Если порядок по умолчанию менять не нужно, то нажмите Enter:')
-    # list_key = '8, 3, 2, 9, 1, 4'  # TODO Удалить после тестов
     try:
         list_key = list_key.split(',')
+        # Проверяем что введены все номера складов, все номера разные и все номера есть в словаре
         list_wh = [dict_list_wh[int(k)] for k in list_key]
+        if len(set(list_wh)) != len(dict_list_wh):
+            raise ValueError
         print(f'Порядок складов изменён: {list_wh}')
-
-    except ValueError as ve:
-        print('Порядок складов установлен по умолчанию.')
+    except (ValueError, KeyError):
+        print(f'Ошибка при вводе складов!!! Порядок складов установлен по умолчанию: {list_wh}')
 
     return list_wh
 
@@ -77,12 +80,12 @@ def input_max_crat_comp():
     return crat, comp, const_crat
 
 
-def input_day_sales_stock():
+def input_day_sales_stock(day_sales, day_stock, period):
     """Запрашиваем кол-во анализируемых дней и дней запаса"""
-    print('Введите 1, если необходимо изменить кол-во дней анализируемых продаж и дней запаса')
-    day_sales, day_stock = 365, 90
+    print(f'Введите 1, если необходимо изменить кол-во дней анализируемых продаж и дней запаса за {period}')
+    # day_sales, day_stock = 365, 91
     try:
-        result = int(input('Если используем дни по умолчанию (365 и 90), то нажмите Enter: '))
+        result = int(input(f'Если используем дни по умолчанию ({day_sales} и {day_stock}), то нажмите Enter: '))
     except ValueError:
         result = 0
     if result:
@@ -91,7 +94,7 @@ def input_day_sales_stock():
             day_stock = int(input('Введите кол-во дней запаса: '))
         except ValueError:
             print('Вы ввели не корректное значение. Это должно быть целое число. Попробуйте ещё раз.')
-            input_day_sales_stock()
+            input_day_sales_stock(day_sales, day_stock, period)
 
     return day_sales, day_stock
 
@@ -114,7 +117,7 @@ def input_use_opt_store():
 def input_day_opt_stock():
     """Запрашиваем использование оптового склада"""
     print('Введите 1, если требуется держать дополнительный запас на оптовом складе')
-    day_opt_stock = DAY_STOCK
+    day_opt_stock = YEAR_DAY_STOCK
     try:
         result = int(input('Если не нужно, то нажмите Enter: '))
     except ValueError:
@@ -208,11 +211,13 @@ def search_file(name):
 
 
 def create_filelist_one_tow_year(filelist: list) -> tuple:
-    """Получаем на вход список с наименованием файлов и возвращаем на два списка."""
+    """Получаем на вход список с наименованием файлов и возвращаем три списка."""
     print(filelist)
     filelist_one = [file for file in filelist if "1 год" in file]
     filelist_two = [file for file in filelist if "2 года" in file]
-    return filelist_one, filelist_two
+    filelist_three_month = [file for file in filelist if "3 мес" in file]
+
+    return filelist_one, filelist_two, filelist_three_month
 
 
 def create_df(file_list, add_name):
@@ -328,77 +333,110 @@ def concat_df(df1, df2):
 
 
 def sort_df(df):
-    sort_list = ['01 Кирова продажи', '01 Кирова МО', '01 Кирова МО расчёт',
-                 '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюбитель МО расчёт',
-                 '03 Интер продажи', '03 Интер МО', '03 Интер МО расчёт',
-                 '04 Победа продажи', '04 Победа МО', '04 Победа МО расчёт',
-                 '08 Центр продажи', '08 Центр МО', '08 Центр МО расчёт',
-                 '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
-                 '05 Павловский МО', '05 Павловский МО расчёт',
-                 'Розн. продажи MaCar', 'Продажи MaCar за 2 года', 'Компания MaCar МО',
-                 'Компания MaCar МО расчёт', 'Компания MaCar МО техническое']
+    sort_list = ['Комплектность', 'Кратность',
+                 f'01 Кирова продажи за {PERIOD_LONG}', f'01 Кирова продажи за {PERIOD_SHOT}', '01 Кирова МО',
+                 f'01 Кирова МО расчёт за {PERIOD_LONG}', f'01 Кирова МО расчёт за {PERIOD_SHOT}',
+                 f'02 Автолюбитель продажи за {PERIOD_LONG}', f'02 Автолюбитель продажи за {PERIOD_SHOT}',
+                 '02 Автолюбитель МО',
+                 f'02 Автолюбитель МО расчёт за {PERIOD_LONG}', f'02 Автолюбитель МО расчёт за {PERIOD_SHOT}',
+                 f'03 Интер продажи за {PERIOD_LONG}', f'03 Интер продажи за {PERIOD_SHOT}', '03 Интер МО',
+                 f'03 Интер МО расчёт за {PERIOD_LONG}', f'03 Интер МО расчёт за {PERIOD_SHOT}',
+                 f'04 Победа продажи за {PERIOD_LONG}', f'04 Победа продажи за {PERIOD_SHOT}', '04 Победа МО',
+                 f'04 Победа МО расчёт за {PERIOD_LONG}', f'04 Победа МО расчёт за {PERIOD_SHOT}',
+                 f'08 Центр продажи за {PERIOD_LONG}', f'08 Центр продажи за {PERIOD_SHOT}', '08 Центр МО',
+                 f'08 Центр МО расчёт за {PERIOD_LONG}', f'08 Центр МО расчёт за {PERIOD_SHOT}',
+                 f'09 Вокзалка продажи за {PERIOD_LONG}', f'09 Вокзалка продажи за {PERIOD_SHOT}', '09 Вокзалка МО',
+                 f'09 Вокзалка МО расчёт за {PERIOD_LONG}', f'09 Вокзалка МО расчёт за {PERIOD_SHOT}',
+                 '05 Павловский МО', 'Розн. продажи MaCar за 2 года', 'Компания MaCar МО', 'Компания MaCar МО техническое']
     if USE_OPT_STORE:
-        sort_list = ['01 Кирова продажи', '01 Кирова МО', '01 Кирова МО расчёт',
-                 '02 Автолюбитель продажи', '02 Автолюбитель МО', '02 Автолюбитель МО расчёт',
-                 '03 Интер продажи', '03 Интер МО', '03 Интер МО расчёт',
-                 '04 Победа продажи', '04 Победа МО', '04 Победа МО расчёт',
-                 '08 Центр продажи', '08 Центр МО', '08 Центр МО расчёт',
-                 '09 Вокзалка продажи', '09 Вокзалка МО', '09 Вокзалка МО расчёт',
-                 '05 Павловский продажи', '05 Павловский МО', '05 Павловский МО расчёт',
-                 'Розн. продажи MaCar', 'Продажи MaCar за 2 года', 'Компания MaCar МО',
-                 'Компания MaCar МО расчёт', 'Компания MaCar МО техническое']
+        sort_list = [f'01 Кирова продажи за {PERIOD_LONG}', f'01 Кирова продажи за {PERIOD_SHOT}', '01 Кирова МО',
+                     f'01 Кирова МО расчёт за {PERIOD_LONG}', f'01 Кирова МО расчёт за {PERIOD_SHOT}',
+                     f'02 Автолюбитель продажи за {PERIOD_LONG}', f'02 Автолюбитель продажи за {PERIOD_SHOT}',
+                     '02 Автолюбитель МО',
+                     f'02 Автолюбитель МО расчёт за {PERIOD_LONG}', f'02 Автолюбитель МО расчёт за {PERIOD_SHOT}',
+                     f'03 Интер продажи за {PERIOD_LONG}', f'03 Интер продажи за {PERIOD_SHOT}', '03 Интер МО',
+                     f'03 Интер МО расчёт за {PERIOD_LONG}', f'03 Интер МО расчёт за {PERIOD_SHOT}',
+                     f'04 Победа продажи за {PERIOD_LONG}', f'04 Победа продажи за {PERIOD_SHOT}', '04 Победа МО',
+                     f'04 Победа МО расчёт за {PERIOD_LONG}', f'04 Победа МО расчёт за {PERIOD_SHOT}',
+                     f'08 Центр продажи за {PERIOD_LONG}', f'08 Центр продажи за {PERIOD_SHOT}', '08 Центр МО',
+                     f'08 Центр МО расчёт за {PERIOD_LONG}', f'08 Центр МО расчёт за {PERIOD_SHOT}',
+                     f'09 Вокзалка продажи за {PERIOD_LONG}', f'09 Вокзалка продажи за {PERIOD_SHOT}', '09 Вокзалка МО',
+                     f'09 Вокзалка МО расчёт за {PERIOD_LONG}', f'09 Вокзалка МО расчёт за {PERIOD_SHOT}',
+                     f'05 Павловский продажи за {PERIOD_LONG}', f'05 Павловский продажи за {PERIOD_LONG}',
+                     '05 Павловский МО',
+                     f'05 Павловский МО расчёт за {PERIOD_LONG}', f'05 Павловский МО расчёт за {PERIOD_SHOT}',
+                     'Розн. продажи MaCar за 2 года', 'Компания MaCar МО', 'Компания MaCar МО техническое']
     df = df[sort_list]
     return df
 
 
-def payment(df_payment):
-    """Расчитываем значения МО расчет с учётом Кратности и Комплектности"""
-
-    columns_payment = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
-                       '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
+def payment(df_payment: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Рассчитываем значения МО расчет с учётом Кратности и Комплектности"""
+    columns_payment = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт',
+                       '03 Интер МО расчёт', '04 Победа МО расчёт',
+                       '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
 
     if USE_OPT_STORE:
         columns_payment += ['05 Павловский МО расчёт']
 
-    DF_COMP_CRAT['Комплектность'] = df_payment['Комплектность'].fillna(1).max(axis=1)
-    DF_COMP_CRAT['Кратность'] = df_payment['Кратность'].fillna(1).max(axis=1)
+    # Получаем значение Кратности и Комплектности
+    df_comp_crat = set_comp_crat(df_payment)
+    # DF_COMP_CRAT['Комплектность'] = df_payment['Комплектность'].fillna(1).max(axis=1)
+    # DF_COMP_CRAT['Кратность'] = df_payment['Кратность'].fillna(1).max(axis=1)
+    #
+    # if CONST_CRAT:
+    #     print(f'Устанавливаем значение кратности равное {CONST_CRAT}')
+    #     DF_COMP_CRAT['Кратность'] = CONST_CRAT
+    # else:
+    #     # Ограничивает значение Кратности и Комплектности введённым пользователем максимальным значением
+    #     DF_COMP_CRAT['Кратность'][DF_COMP_CRAT['Кратность'] >= MAX_CRAT] = MAX_CRAT
+    # DF_COMP_CRAT['Комплектность'][DF_COMP_CRAT['Комплектность'] >= MAX_COMP] = MAX_COMP
 
-    if CONST_CRAT:
-        print(f'Устанавливаем значение кратности равное {CONST_CRAT}')
-        DF_COMP_CRAT['Кратность'] = CONST_CRAT
-    else:
-        # Ограничивает значение Кратности и Комплектности введённым пользователем максимальным значением
-        DF_COMP_CRAT['Кратность'][DF_COMP_CRAT['Кратность'] >= MAX_CRAT] = MAX_CRAT
-    DF_COMP_CRAT['Комплектность'][DF_COMP_CRAT['Комплектность'] >= MAX_COMP] = MAX_COMP
+    # Добавляем колонки сроков анализа и запаса
+    d_sal, d_stock = data_day(period)
+    df_payment[f'Кол-во дней анализа за {period}'] = d_sal
+    df_payment[f'Кол-во дней запаса на {period}'] = d_stock
 
     # df_payment = sum_retail_sales(df_payment) # TODO Разбираюсь как корректно сложить Итоговое значение
     for i in range(len(columns_payment)):
         # Суммируем продажи по всем складам подразделения
-        df_payment[columns_payment[i][:-10] + ' продажи'] = df_payment.filter(like=columns_payment[i][:-10]).sum(axis=1)
-
+        df_payment[columns_payment[i][:-10] + f' продажи за {period}'] = \
+            df_payment.filter(like=columns_payment[i][:-10]).sum(axis=1)
 
         # Рассчитываем значения исходя из периода анализируемых продажи и периода запасов
-        df_payment[columns_payment[i]] = df_payment[columns_payment[i][:-10] + ' продажи'].fillna(0).apply(calc)
+        # df_payment[columns_payment[i] + f' за {period}'] = \
+        #     df_payment[columns_payment[i][:-10] + f' продажи за {period}'].fillna(0).apply(calc, period=period)
+        # Обнуляем все не определённые значения
+        df_payment[columns_payment[i] + f' за {period}'] = \
+            df_payment[columns_payment[i][:-10] + f' продажи за {period}'].fillna(0)
+
+
+        # Выполняем расчёт значения МО исходя из дней анализа и запаса
+        df_payment[columns_payment[i] + f' за {period}'] = \
+            df_payment[columns_payment[i] + f' за {period}'] / \
+            df_payment[f'Кол-во дней анализа за {period}'] * df_payment[f'Кол-во дней запаса на {period}']
 
         # Обнуляем все рассчитанные МО меньше 0
-        mask_lz = df_payment[columns_payment[i]] < 0
-        df_payment.loc[mask_lz, columns_payment[i]] = 0
+        mask_lz = df_payment[columns_payment[i] + f' за {period}'] < 0
+        df_payment.loc[mask_lz, columns_payment[i] + f' за {period}'] = 0
 
-        # Применяем значения Кратности и Комплектности к рассчитанным значениям.
-        # Приравниваем расчётные значения от 0 до 1 к значению кратности
-        mask_min_crat = (df_payment[columns_payment[i]] > 0) & \
-                        (df_payment[columns_payment[i]] < DF_COMP_CRAT['Кратность'])
-        df_payment.loc[mask_min_crat, columns_payment[i]] = DF_COMP_CRAT.loc[mask_min_crat, 'Кратность']
-
-        # Если есть расчётные значения больше 0 до значения Комплектности, то устанавливаем значения комплектности
-        mask_min_comp = (df_payment[columns_payment[i]] > 0) & \
-                        (df_payment[columns_payment[i]] < DF_COMP_CRAT['Комплектность'])
-        df_payment.loc[mask_min_comp, columns_payment[i]] = DF_COMP_CRAT.loc[mask_min_comp, 'Комплектность']
-
-        # Все расчётные значения больше комплектности устанавливаем согласно кратности
-        df_payment.loc[~mask_min_comp, columns_payment[i]] = round(
-            (df_payment.loc[~mask_min_comp, columns_payment[i]] + 0.000001) /
-            DF_COMP_CRAT.loc[~mask_min_comp, 'Кратность']) * DF_COMP_CRAT.loc[~mask_min_comp, 'Кратность']
+        # # Применяем значения Кратности и Комплектности к рассчитанным значениям.
+        # # Приравниваем расчётные значения от 0 до 1 к значению кратности
+        # mask_min_crat = (df_payment[columns_payment[i] + f' за {period}'] > 0) & \
+        #                 (df_payment[columns_payment[i] + f' за {period}'] < df_comp_crat['Кратность'])
+        # df_payment.loc[mask_min_crat, columns_payment[i] + f' за {period}'] = \
+        #     df_comp_crat.loc[mask_min_crat, 'Кратность']
+        #
+        # # Если есть расчётные значения больше 0 до значения Комплектности, то устанавливаем значения комплектности
+        # mask_min_comp = (df_payment[columns_payment[i] + f' за {period}'] > 0) & \
+        #                 (df_payment[columns_payment[i] + f' за {period}'] < df_comp_crat['Комплектность'])
+        # df_payment.loc[mask_min_comp, columns_payment[i] + f' за {period}'] = df_comp_crat.loc[
+        #     mask_min_comp, 'Комплектность']
+        #
+        # # Все расчётные значения больше комплектности устанавливаем согласно кратности
+        # df_payment.loc[~mask_min_comp, columns_payment[i] + f' за {period}'] = round(
+        #     (df_payment.loc[~mask_min_comp, columns_payment[i] + f' за {period}'] + 0.000001) /
+        #     df_comp_crat.loc[~mask_min_comp, 'Кратность']) * df_comp_crat.loc[~mask_min_comp, 'Кратность']
     return df_payment
 
 
@@ -409,9 +447,38 @@ def sum_retail_sales(df, name):
     return df
 
 
-def calc(val):
-    quan_prod = val / DAY_SALES * DAY_STOCK
-    return int(quan_prod) if quan_prod >= 1 else quan_prod
+# def calc(val, period):
+#     day_sales, day_stock = (YEAR_DAY_SALES, YEAR_DAY_STOCK) if period == "за 1 год" else (
+#     MONTH_DAY_SALES, MONTH_DAY_STOCK)
+#     quan_prod = val / day_sales * day_stock
+#     return int(quan_prod) if quan_prod >= 1 else quan_prod
+
+
+def data_day(period):
+    """Возвращаем количество дней анализа и запаса в зависимости от периода анализа
+    :param: period -> Длинный период или другое
+    :return: day_sales, day_stock -> Количество дней анализа и запаса
+    """
+    if period == PERIOD_LONG:
+        day_sales, day_stock = YEAR_DAY_SALES, YEAR_DAY_STOCK
+    else:
+        day_sales, day_stock = MONTH_DAY_SALES, MONTH_DAY_STOCK
+    return day_sales, day_stock
+
+
+def set_comp_crat(df: pd.DataFrame) -> pd.DataFrame:
+    df_temp = pd.DataFrame()
+    df_temp['Комплектность'] = df['Комплектность'].fillna(1).max(axis=1)
+    df_temp['Кратность'] = df['Кратность'].fillna(1).max(axis=1)
+
+    if CONST_CRAT:
+        print(f'Устанавливаем значение кратности равное {CONST_CRAT}')
+        df_temp['Кратность'] = CONST_CRAT
+    else:
+        # Ограничивает значение Кратности и Комплектности введённым пользователем максимальным значением
+        df_temp['Кратность'][df_temp['Кратность'] >= MAX_CRAT] = MAX_CRAT
+    df_temp['Комплектность'][df_temp['Комплектность'] >= MAX_COMP] = MAX_COMP
+    return df_temp
 
 
 def df_write_xlsx(df):
@@ -433,7 +500,7 @@ def df_write_xlsx(df):
 
         # Получаем словари форматов для эксель
         header_format, con_format, border_storage_format_left, border_storage_format_right, \
-            name_format, MO_format, data_format = format_custom(workbook)
+        name_format, MO_format, data_format = format_custom(workbook)
 
         for col_num, value in enumerate(df.columns.values):
             wks1.write(0, col_num, value, header_format)
@@ -468,7 +535,7 @@ def df_write_xlsx(df):
                     wks1.set_column(i, i, None, MO_format)
                     # wks1.set_column(i + 2, i + 2, None, border_storage_format_right)
                 elif i == 23:
-                    wks1.set_column(i-1, i-1, None, border_storage_format_left)
+                    wks1.set_column(i - 1, i - 1, None, border_storage_format_left)
                     wks1.set_column(i + 1, i + 1, None, MO_format)
                     # wks1.set_column(i + 3, i + 3, None, border_storage_format_right)
                 else:
@@ -491,12 +558,12 @@ def df_write_xlsx(df):
         # Добавляем выделение цветом строки при МО=0 по всей компании
         if USE_OPT_STORE:
             wks1.conditional_format(f'A2:AB{row_end_str}', {'type': 'formula',
-                                                           'criteria': '=AND($Z2=0,$Y2<>0)',
-                                                           'format': con_format})
+                                                            'criteria': '=AND($Z2=0,$Y2<>0)',
+                                                            'format': con_format})
         else:
             wks1.conditional_format(f'A2:AB{row_end_str}', {'type': 'formula',
-                                                           'criteria': '=AND($Y2=0,$X2<>0)',
-                                                           'format': con_format})
+                                                            'criteria': '=AND($Y2=0,$X2<>0)',
+                                                            'format': con_format})
 
         # Добавляем фильтр в первую колонку
         wks1.autofilter(0, 0, row_end + 1, col_end)
@@ -578,7 +645,7 @@ def format_custom(workbook):
     })
 
     return header_format, con_format, border_storage_format_left, border_storage_format_right, \
-        name_format, MO_format, data_format
+           name_format, MO_format, data_format
 
 
 def final_calc(row):
@@ -591,6 +658,181 @@ def final_calc(row):
     :param row: Series pandas
     :return: Series pandas
     """
+
+    # Сортируем список складов согласно их среднего значения
+    list_wh_sorted = sorted(LIST_WH, key=lambda x: row[f'{x} среднее значение'], reverse=True)
+    print(list_wh_sorted)
+    value_default = row['Кратность']
+    count_pass = row['Розн. MaCar МО расчёт (окр.)'] / value_default
+    for i in list_wh_sorted:
+        row[i + ' тех'] = 0
+
+    # Выводим на экран среднее значение каждого склада
+    for item in list_wh_sorted:
+        print(f'{item} {row[f"{item} среднее значение"]}')
+    # TODO Удалить после тестов
+    # list_col = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
+    #             '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
+    list_col = [wh + ' МО расчёт' for wh in list_wh_sorted]
+    # list_sales = [wh + ' продажи' for wh in list_wh_sorted]
+    # list_mo = [wh + ' МО' for wh in list_wh_sorted]
+    # print(list_col)
+    prior_wh_mo, prior_wh_calc = None, None
+    if PRIOR_WH:
+        prior_wh_mo = PRIOR_WH + ' МО'
+        prior_wh_calc = PRIOR_WH + ' МО расчёт'
+
+    if row['Розн. MaCar МО расчёт (окр.)'] / value_default <= 0:
+        if row['Розн. продажи MaCar за 2 года'] <= 0:
+            for i in list_col:
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.8)
+        else:
+            for i in list_col:
+                row[i] = set_value_mo_0_1(row[i[:-7]], 0.91)
+
+    elif row['Розн. MaCar МО расчёт (окр.)'] / value_default == 1:
+        for i in list_col:
+            if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
+                # Устанавливаем ... МО расчёт согласно приоритетного склада
+                row[prior_wh_calc] = set_value_mo_0_9(row[prior_wh_mo], value_default)
+                if i != prior_wh_calc:
+                    if row[i] >= 1:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+                    else:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+            else:
+                # Устанавливаем ... МО расчёт без приоритетного склада
+                if row[i] == 0:
+                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+                else:
+                    if count_pass > 0:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
+                        count_pass -= 1
+                    else:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+
+    elif row['Розн. MaCar МО расчёт (окр.)'] / value_default == 2:
+        if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9) and row[prior_wh_calc] == 0:
+            # Устанавливаем ... МО расчёт согласно приоритетного склада
+
+            # Переставляем приоритетный склад вперёд списка и переворачиваем остальной список
+            list_col1 = [prior_wh_calc] + [col for col in reversed(list_col) if col != prior_wh_calc]
+            # TODO Дальше код не смотрел, надо проверить. а что если обе продажи на одном складе?
+            first_pass = True
+            for i in list_col1:
+                if row[i] == 0:
+                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+                elif row[i] >= 1 and count_pass > 0:
+                    if row[i[:-7]] >= 0.9 or row[i[:-7]] == 0:
+                        if first_pass:
+                            row[prior_wh_calc] = set_value_mo_0_9(row[prior_wh_mo], value_default)
+                            row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+                            first_pass = False
+                        else:
+                            row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
+                        count_pass -= row[i]
+                    else:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
+                else:
+                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+        else:
+            # TODO Дальше код не смотрел, надо проверить
+            for i in list_col:
+                if row[i] == 0:
+                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+                elif row[i] >= 1 and count_pass > 0:
+                    if row[i[:-7]] >= 0.9 or row[i[:-7]] == 0:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
+                        count_pass -= row[i]
+                    else:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
+                else:
+                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+    # TODO Дальше код не смотрел, надо проверить
+    elif row['Розн. MaCar МО расчёт (окр.)'] / value_default > 2:
+        pass
+    # TODO Дальше код не смотрел, надо проверить
+    elif 2 < row[f'Розн. продажи MaCar за {PERIOD_LONG}'] < VALUE_ALL_PRIOR_WH:
+        val_min_mo = row['Кратность']  # TODO Переделать если начнём использовать Комплектность
+        # В колонке с окончанием " тех" рассчитываем необходимо для установки МО
+        while count_pass > 0:
+            for i in list_col:
+                if row[i] > 0 and (row[i[:-7]] == 0 or row[i[:-7]] >= 0.9) and row[i + ' тех'] < row[i]:
+                    row[i + ' тех'] += val_min_mo
+                    # row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+                    count_pass -= row['Кратность']
+                # row[i] = set_value_mo_0_9(row[i[:-7]], val_min_mo)
+            val_min_mo += row['Кратность']
+        for i in list_col:
+            row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i + ' тех'])
+
+    elif row[f'Розн. продажи MaCar за {PERIOD_LONG}'] >= VALUE_ALL_PRIOR_WH:
+        for i in list_col:
+            val_default = row[['Комплектность', 'Кратность']].max()
+            row[i] = set_value_mo_0_9(row[i[:-7]], val_default if row[i] == 0 else row[i])
+
+    # Обнуляем расчётные значения оптового склада, если их не надо учитывать
+    if not USE_OPT_STORE:
+        row['05 Павловский МО расчёт'] = 0
+
+    # Получаем сумму всех рассчитанных значений МО розничных складов
+    val_all_sales = 0
+    for i in list_col:
+        val_all_sales += int(row[i])
+
+    # Определяем необходимое количество сверх запасов розничных складов и устанавливаем значение
+    val_opt = val_all_sales * (DAY_OPT_STOCK / DAY_STOCK)
+    val_opt = val_opt - val_all_sales
+    row['05 Павловский МО расчёт'] = row['05 Павловский МО расчёт'] + val_opt if val_opt > 0 else 0
+
+    # Приводим рассчитанные значение в колонке '05 Павловский МО расчёт' к значению Кратности или Комплектности
+    if (row['05 Павловский МО расчёт'] > 0) & (row['05 Павловский МО расчёт'] < row['Кратность']):
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], row['Кратность'])
+
+    if (row['05 Павловский МО расчёт'] > 0) & (row['05 Павловский МО расчёт'] < row['Комплектность']):
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], row['Комплектность'])
+
+    if row['05 Павловский МО расчёт'] > row['Комплектность']:
+        opt_val = round(
+            (row['05 Павловский МО расчёт'] + 0.000001) / row['Кратность']
+        ) * row['Кратность']
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], opt_val)
+
+    # Устанавливаем расчётные значения оптового склада согласно правилам и МО на этом складе
+    if row['05 Павловский МО расчёт'] == 0:
+        row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], 0.96)
+
+    if row['Розн. продажи MaCar'] <= 0:
+        if row['Розн. продажи MaCar за 2 года'] <= 0:
+            row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], 0.8)
+        else:
+            row['05 Павловский МО расчёт'] = set_value_mo_0_1(row['05 Павловский МО'], 0.91)
+
+    row['Компания MaCar МО расчёт'] = 0
+    for i in list_col:
+        row['Компания MaCar МО расчёт'] += int(row[i])
+    row['Компания MaCar МО расчёт'] += int(row['05 Павловский МО расчёт'])
+    if row['Розн. продажи MaCar'] == 0:
+        if row['Розн. продажи MaCar за 2 года'] <= 0:
+            row['Компания MaCar МО расчёт'] = 0.8
+        else:
+            row['Компания MaCar МО расчёт'] = 0.91
+    row['Компания MaCar МО расчёт'] = set_value_mo_0_9(row['Компания MaCar МО техническое'],
+                                                       row['Компания MaCar МО расчёт'])
+    return row
+
+
+def final_calc_old(row): # TODO: Удалить после тестирования
+    """
+    На основании данных продаж из колонки "Розн. продажи MaCar" корректируем значения в колонках "... МО расчёт"
+    Так же на основании этих данных добавляем колонку "05 Павловский МО расчёт" и подставляем значения.
+    Добавляем колонку "Компания MaCar МО расчёт", которая является суммой целых чисел всех колонок с
+    наименованием "... МО расчёт"
+
+    :param row: Series pandas
+    :return: Series pandas
+    """
+
     # list_col = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
     #             '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
     list_col = [wh + ' МО расчёт' for wh in LIST_WH]
@@ -604,7 +846,7 @@ def final_calc(row):
 
     # TODO Дальше код не смотрел, надо проверить
     if row['Розн. продажи MaCar'] <= 0:
-        if row['Продажи MaCar за 2 года'] <= 0:
+        if row['Розн. продажи MaCar за 2 года'] <= 0:
             for i in list_col:
                 row[i] = set_value_mo_0_9(row[i[:-7]], 0.8)
         else:
@@ -625,13 +867,18 @@ def final_calc(row):
                 else:
                     row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
             else:
-                # Устанавливаем ... МО расчёт согласно приоритетного склада
+                # Устанавливаем ... МО расчёт без приоритетного склада
                 row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i])
 
     elif row['Розн. продажи MaCar'] == 2:
         if PRIOR_WH:
             if 0 < row[prior_wh_mo] < 0.9 or row[prior_wh_calc] >= 1:
                 for i in list_col:
+                    # Подставляем расчётные значения пока 'Розн. расчёт MaCar' > 0
+                    if row['Розн. расчёт MaCar'] > 0:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+                    else:
+                        row[i] = set_value_mo_0_9(row[i[:-7]], 0.91)
                     row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i])
             else:
                 # Переставляем приоритетный склад вперёд списка и переворачиваем остальной список
@@ -765,7 +1012,7 @@ def final_calc(row):
         row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], 0.96)
 
     if row['Розн. продажи MaCar'] <= 0:
-        if row['Продажи MaCar за 2 года'] <= 0:
+        if row['Розн. продажи MaCar за 2 года'] <= 0:
             row['05 Павловский МО расчёт'] = set_value_mo_0_9(row['05 Павловский МО'], 0.8)
         else:
             row['05 Павловский МО расчёт'] = set_value_mo_0_1(row['05 Павловский МО'], 0.91)
@@ -775,7 +1022,7 @@ def final_calc(row):
         row['Компания MaCar МО расчёт'] += int(row[i])
     row['Компания MaCar МО расчёт'] += int(row['05 Павловский МО расчёт'])
     if row['Розн. продажи MaCar'] == 0:
-        if row['Продажи MaCar за 2 года'] <= 0:
+        if row['Розн. продажи MaCar за 2 года'] <= 0:
             row['Компания MaCar МО расчёт'] = 0.8
         else:
             row['Компания MaCar МО расчёт'] = 0.91
@@ -803,55 +1050,108 @@ def set_value_mo_0_1(mo_old: float, value: float) -> float:
 
 
 def total_value_calc(row: pd.Series) -> pd.Series:
-    """Рассчитываем общее значения Розн. продажи MaCar, Розн. расчёт MaCar.
+    """Рассчитываем средние значения по каждому складу, общее значения Розн. продажи MaCar за длинный период,
+    вес склада, Розн. продажи MaCar за короткий период, Розн. продажи MaCar среднее значение, Розн. расчёт MaCar.
     :param row: Строка с данными по продажам, МО и расчётным значениям.
-    :return: Строка с общими данными по продажам и расчётным значениям.
+    :return: Строка row с добавленными колонками.
     """
-    list_sales = [wh + ' продажи' for wh in LIST_WH]
+    list_sales_long = [wh + f' продажи за {PERIOD_LONG}' for wh in LIST_WH]
+    list_sales_shot = [wh + f' продажи за {PERIOD_SHOT}' for wh in LIST_WH]
     list_mo = [wh + ' МО' for wh in LIST_WH]
-    # Суммируем данные из колонки list_sales в отдельную колонку, если МО == 0 или МО >= 0.9
-    row['Розн. продажи MaCar'] = 0
-    row['Розн. расчёт MaCar'] = 0
+    list_calc_long = [wh + f' МО расчёт за {PERIOD_LONG}' for wh in LIST_WH]
+    list_calc_shot = [wh + f' МО расчёт за {PERIOD_SHOT}' for wh in LIST_WH]
+    list_calc_merge = [wh + f' МО среднее значение' for wh in LIST_WH]
+    day_sales_long, day_stock_long = data_day(PERIOD_LONG)
+    day_sales_shot, day_stock_shot = data_day(PERIOD_SHOT)
+
+    # Суммируем данные из колонок list_sales... в отдельные колонку, если МО == 0 или МО >= 0.9
+    row[f'Розн. продажи MaCar за {PERIOD_LONG}'] = 0
+    row[f'Розн. продажи MaCar за {PERIOD_SHOT}'] = 0
+    row[f'Розн. MaCar МО расчёт за {PERIOD_LONG}'] = 0
+    row[f'Розн. MaCar МО расчёт за {PERIOD_SHOT}'] = 0
+
     for key, item in enumerate(list_mo):
         if (row[item] == 0) or (row[item] >= 0.9):
-            row['Розн. продажи MaCar'] += row[list_sales[key]]
+            row[f'Розн. продажи MaCar за {PERIOD_LONG}'] += row[list_sales_long[key]]
+            row[f'Розн. продажи MaCar за {PERIOD_SHOT}'] += row[list_sales_shot[key]]
 
-    row['Розн. расчёт MaCar'] = row['Розн. продажи MaCar'] / DAY_SALES * DAY_STOCK
+            # Рассчитываем среднее значение по каждому складу
+            row[f'{LIST_WH[key]} МО среднее значение'] = \
+                (row[list_calc_long[key]] + row[list_calc_shot[key]]) / 2
+        else:
+            row[f'{LIST_WH[key]} МО среднее значение'] = 0
+
+        # Рассчитываем расчётное значение МО на каждый склад с учетом кратности и комплектности
+        row[f'{LIST_WH[key]} МО расчёт'] = row[f'{LIST_WH[key]} МО среднее значение']
+        if row[f'{LIST_WH[key]} МО расчёт'] < 0:
+            row[f'{LIST_WH[key]} МО расчёт'] = 0
+        if 0 < row[f'{LIST_WH[key]} МО расчёт'] < row['Кратность']:
+            row[f'{LIST_WH[key]} МО расчёт'] = row['Кратность']
+        if 0 < row[f'{LIST_WH[key]} МО расчёт'] < row['Комплектность']:
+            row[f'{LIST_WH[key]} МО расчёт'] = row['Комплектность']
+        else:
+            # Все расчётные значения больше комплектности устанавливаем согласно кратности
+            row[f'{LIST_WH[key]} МО расчёт'] = \
+                round(row[f'{LIST_WH[key]} МО расчёт'] / row['Кратность']) * row['Кратность']
+
+    # Рассчитываем значение Розн. MaCar МО расчёт за длинный период
+    row[f'Розн. MaCar МО расчёт за {PERIOD_LONG}'] = \
+        row[f'Розн. продажи MaCar за {PERIOD_LONG}'] / day_sales_long * day_stock_long
+    row[f'Розн. MaCar МО расчёт за {PERIOD_LONG}'] = \
+        row[f'Розн. MaCar МО расчёт за {PERIOD_LONG}'] if row[f'Розн. MaCar МО расчёт за {PERIOD_LONG}'] >= 0 else 0
+
+    # Рассчитываем значение Розн. MaCar МО расчёт за короткий период
+    row[f'Розн. MaCar МО расчёт за {PERIOD_SHOT}'] = \
+        row[f'Розн. продажи MaCar за {PERIOD_SHOT}'] / day_sales_shot * day_stock_shot
+    row[f'Розн. MaCar МО расчёт за {PERIOD_SHOT}'] = \
+        row[f'Розн. MaCar МО расчёт за {PERIOD_SHOT}'] if row[f'Розн. MaCar МО расчёт за {PERIOD_SHOT}'] >= 0 else 0
+
+    # Рассчитываем среднее значение Розн. MaCar МО расчёт
+    row[f'Розн. MaCar МО среднее значение'] = \
+        (row[f'Розн. MaCar МО расчёт за {PERIOD_LONG}'] + row[f'Розн. MaCar МО расчёт за {PERIOD_SHOT}']) / 2
 
     # Приравниваем все расчетные значения меньше нуля к нулю
-    if row['Розн. расчёт MaCar'] < 0:
-        row['Розн. расчёт MaCar'] = 0
+    if row['Розн. MaCar МО среднее значение'] < 0:
+        row['Розн. MaCar МО среднее значение'] = 0
+
     # Округляем все остальные значения в большую сторону
     else:
-        row['Розн. расчёт MaCar'] = math.ceil(row['Розн. расчёт MaCar'])
+        row['Розн. MaCar МО расчёт (окр.)'] = math.ceil(row['Розн. MaCar МО среднее значение'])
 
     # Если расчётное значение больше 0, но меньше Кратности, то приводим к значению Кратности
-    if 0 < row['Розн. расчёт MaCar'] < row['Кратность']:
-        row['Розн. расчёт MaCar'] = row['Кратность']
+    if 0 < row['Розн. MaCar МО расчёт (окр.)'] < row['Кратность']:
+        row['Розн. MaCar МО расчёт (окр.)'] = row['Кратность']
+
     # Если расчётное значение больше 0, но меньше Комплектности, то приводим к значению Комплектности
-    if 0 < row['Розн. расчёт MaCar'] < row['Комплектность']:
-        row['Розн. расчёт MaCar'] = row['Комплектность']
-    elif row['Розн. расчёт MaCar'] >= row['Комплектность']:
-        row['Розн. расчёт MaCar'] = math.ceil(
-            row['Розн. расчёт MaCar'] / row['Кратность']
+    if 0 < row['Розн. MaCar МО расчёт (окр.)'] < row['Комплектность']:
+        row['Розн. MaCar МО расчёт (окр.)'] = row['Комплектность']
+    elif row['Розн. MaCar МО расчёт (окр.)'] >= row['Комплектность']:
+        row['Розн. MaCar МО расчёт (окр.)'] = math.ceil(
+            row['Розн. MaCar МО расчёт (окр.)'] / row['Кратность']
         ) * row['Кратность']
 
     return row
 
 
-def create_final_df(df1: object, df2: object, df3: object):
+def create_final_df(df1: pd.DataFrame, df2: pd.DataFrame, df3: pd.DataFrame, df4: pd.DataFrame) -> pd.DataFrame:
     """Создаём финальный DataFrame
     :param df1:
     :param df2:
     :param df3:
-
+    :param df4:
+    :return :
     """
     df_final = concat_df(df1, df2)
-    df_final.drop(columns=['Комплектность', 'Кратность'], inplace=True)
-    df_final['Компания MaCar МО техническое'] = df_final['Компания MaCar МО']
-    df_final = concat_df(df_final, DF_COMP_CRAT)
     df_final = concat_df(df_final, df3)
+    df_final = concat_df(df_final, df4)
+    df_comp_crat = set_comp_crat(df_final)
+    df_final.drop(columns=['Комплектность', 'Кратность'], inplace=True)
+    df_final = concat_df(df_final, df_comp_crat)
+    df_final['Компания MaCar МО техническое'] = df_final['Компания MaCar МО']
     df_final[['Комплектность', 'Кратность']] = df_final[['Комплектность', 'Кратность']].fillna(1)
+    df_final = sort_df(df_final)  # Оставляем только необходимые столбцы в нужном порядке
+    return df_final.fillna(0)
+
     df_final = df_final.fillna(0).apply(total_value_calc, axis=1)  # Рассчитываем общие значения
     df_final = df_final.apply(final_calc, axis=1)  # осуществляем последние расчёты по каждой строке
     df_final = sort_df(df_final)  # сортируем столбцы
@@ -862,40 +1162,57 @@ def run():
     sales_filelist = search_file(salesName)  # Запускаем метод по поиску файлов и получаем список файлов
     minstock_filelist = search_file(minStockName)  # Запускаем метод по поиску файлов и получаем список файлов
 
-    # Разделяем файлы на два списка: один год и два года
-    sales_filelist_one_year, sales_filelist_two_year = create_filelist_one_tow_year(sales_filelist)
+    # Разделяем файлы на три списка: один год, два года и три месяца
+    sales_filelist_one_year, sales_filelist_two_year, sales_filelist_three_month = \
+        create_filelist_one_tow_year(sales_filelist)
 
     # Создаём DataFrame с продажами за 2 года
     df_sales_two_year = create_df(sales_filelist_two_year, salesName)
     # Суммируем продажи за 2 года
-    df_sales_two_year = sum_retail_sales(df_sales_two_year, name='Продажи MaCar за 2 года')
-    df_sales_two_year = df_sales_two_year['Продажи MaCar за 2 года']
+    df_sales_two_year = sum_retail_sales(df_sales_two_year, name='Розн. продажи MaCar за 2 года')
+    df_sales_two_year = df_sales_two_year['Розн. продажи MaCar за 2 года']
 
-    # Создаём DataFrame с продажами за 1 год
+    # Создаём DataFrame с продажами за длинный период
     df_sales_one_year = create_df(sales_filelist_one_year, salesName)
-    # Расчитываем значения МО расчет с учётом Кратности и Комплектности
-    df_sales_one_year = payment(df_sales_one_year)
+    # Рассчитываем значения МО расчет с учётом Кратности и Комплектности
+    df_sales_one_year = payment(df_sales_one_year, PERIOD_LONG)
+
+    # Создаём DataFrame с продажами за короткий период
+    df_sales_three_month = create_df(sales_filelist_three_month, salesName)
+    # Рассчитываем значения МО расчет с учётом Кратности и Комплектности
+    df_sales_three_month = payment(df_sales_three_month, PERIOD_SHOT)
 
     # Создаём DataFrame с минимальными остатками
     df_minstock = create_df(minstock_filelist, minStockName)
 
-    # Создаём конечный DataFrame
-    df_general = create_final_df(df_minstock, df_sales_one_year, df_sales_two_year)
+    # Объединяем полученные данные в единый DataFrame
+    df_final = create_final_df(df_minstock, df_sales_one_year, df_sales_two_year, df_sales_three_month)
+
+    # Рассчитываем итоговые значения по компании
+    df_final = df_final.apply(total_value_calc, axis=1)
+
+    # Осуществляем последние расчёты по каждой строке
+    # df_final = df_final.apply(final_calc, axis=1)
+    df_final.to_excel('test_final.xlsx')
+    return
 
     # Сохраняем конечный результат в эксель
-    df_write_xlsx(df_general)
+    df_write_xlsx(df_final)
 
 
 if __name__ == '__main__':
     LIST_WH = input_list_wh()  # Запрашиваем список складов
     MAX_CRAT, MAX_COMP, CONST_CRAT = input_max_crat_comp()  # Задаём максимальное значение Кратности и Комплектности
     PRIOR_WH = input_prior_wh()  # Задаём приоритетный склад
-    DAY_SALES, DAY_STOCK = input_day_sales_stock()  # Задаём кол-во дней для расчётов Розничных складов
+    # Задаём кол-во дней для расчётов Розничных складов за длинный период
+    YEAR_DAY_SALES, YEAR_DAY_STOCK = input_day_sales_stock(365, 91, PERIOD_LONG)
+    # Задаём кол-во дней для расчётов Розничных складов за короткий период
+    MONTH_DAY_SALES, MONTH_DAY_STOCK = input_day_sales_stock(91, 91, PERIOD_SHOT)
     USE_OPT_STORE = input_use_opt_store()  # Задаём учёт продаж оптового склада для установки МО
     DAY_OPT_STOCK = input_day_opt_stock()  # Задаём кол-во дней запаса для оптового склада
     # Задаём значение продаж для применения всех приоритетных складов
     VALUE_ALL_PRIOR_WH = input_value_all_prior_wh()
     # Задаём значение продаж и список дополнительных приоритетных складов
-    VALUE_ADD_PRIOR_WH, LIST_ADD_PRIOR_WH = input_value_add_prior_wh()
+    # VALUE_ADD_PRIOR_WH, LIST_ADD_PRIOR_WH = input_value_add_prior_wh() TODO Пока решили не использовать
     # Запускаем программу
     run()
