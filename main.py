@@ -712,6 +712,7 @@ def final_calc(row):
                         row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
 
     elif row['Розн. MaCar МО расчёт (окр.)'] / value_default == 2:
+
         if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9) and row[prior_wh_calc] == 0:
             # Устанавливаем ... МО расчёт согласно приоритетного склада
 
@@ -719,35 +720,31 @@ def final_calc(row):
             list_col1 = [prior_wh_calc] + [col for col in reversed(list_col) if col != prior_wh_calc]
             # TODO Дальше код не смотрел, надо проверить. а что если обе продажи на одном складе?
             first_pass = True
-            for i in list_col1:
-                if row[i] == 0:
-                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
-                elif row[i] >= 1 and count_pass > 0:
-                    if row[i[:-7]] >= 0.9 or row[i[:-7]] == 0:
+            while count_pass > 0:
+                for i in list_col1:
+                    if row[i] >= 1 and row[i] > row[i + ' тех']:
                         if first_pass:
-                            row[prior_wh_calc] = set_value_mo_0_9(row[prior_wh_mo], value_default)
-                            row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+                            row[prior_wh_calc + ' тех'] += value_default
                             first_pass = False
                         else:
-                            row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
-                        count_pass -= row[i]
-                    else:
-                        row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
-                else:
-                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+                            row[i + ' тех'] += value_default
+                        count_pass -= 1
+
         else:
-            # TODO Дальше код не смотрел, надо проверить
-            for i in list_col:
-                if row[i] == 0:
-                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
-                elif row[i] >= 1 and count_pass > 0:
-                    if row[i[:-7]] >= 0.9 or row[i[:-7]] == 0:
-                        row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
-                        count_pass -= row[i]
-                    else:
-                        row[i] = set_value_mo_0_9(row[i[:-7]], value_default)
-                else:
-                    row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+            while count_pass > 0:
+                for i in list_col:
+                    if row[i] >= 1 and row[i] > row[i + ' тех']:
+                        row[i + ' тех'] += value_default
+                        count_pass -= 1
+        for i in list_col:
+            if row[i] >= 1 and row[i + ' тех'] >= 1:
+                row[i] = set_value_mo_0_9(row[i[:-7]], row[i + ' тех'])
+            elif row[i] >= 1 and row[i + ' тех'] == 0:
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+            elif row[i] == 0:
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+
+
     # TODO Дальше код не смотрел, надо проверить
     elif row['Розн. MaCar МО расчёт (окр.)'] / value_default > 2:
         pass
