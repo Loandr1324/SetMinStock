@@ -42,12 +42,25 @@ def input_list_wh():
 
 def input_prior_wh():
     """Запрашиваем приоритетный склад у пользователя"""
-    print('Введите приоритетный склад из списка ' + ', '.join(LIST_WH))
-    prior = input('Если приоритетного склада нет, то нажмите Enter: ')
-
-    if prior not in LIST_WH:
-        print(f'Вы не ввели приоритетный склад, либо наименования {prior} нет в списке.')
-        prior = False
+    print('Введите цифру приоритетного склада из списка ' + ', '.join(LIST_WH))
+    key = input('Если приоритетного склада нет, то нажмите Enter: ')
+    dict_list_wh = {
+        1: '01 Кирова',
+        2: '02 Автолюбитель',
+        3: '03 Интер',
+        4: '04 Победа',
+        8: '08 Центр',
+        9: '09 Вокзалка'
+    }
+    prior = False
+    try:
+        prior = dict_list_wh[int(key)]
+        print(f'Установлен приоритетный склад {prior}')
+    except ValueError:
+        print(f'Вы не ввели приоритетный склад, либо {key} не является номером склада.')
+    except KeyError:
+        print(f'В списке нет склада с номером {key}. Попробуйте ещё раз.')
+        input_prior_wh()
     return prior
 
 
@@ -660,28 +673,37 @@ def final_calc(row):
     """
 
     # Сортируем список складов согласно их среднего значения
-    list_wh_sorted = sorted(LIST_WH, key=lambda x: row[f'{x} среднее значение'], reverse=True)
-    print(list_wh_sorted)
-    value_default = row['Кратность']
-    count_pass = row['Розн. MaCar МО расчёт (окр.)'] / value_default
-    for i in list_wh_sorted:
-        row[i + ' тех'] = 0
-
-    # Выводим на экран среднее значение каждого склада
-    for item in list_wh_sorted:
-        print(f'{item} {row[f"{item} среднее значение"]}')
-    # TODO Удалить после тестов
-    # list_col = ['01 Кирова МО расчёт', '02 Автолюбитель МО расчёт', '03 Интер МО расчёт',
-    #             '04 Победа МО расчёт', '08 Центр МО расчёт', '09 Вокзалка МО расчёт']
+    list_wh_sorted = sorted(LIST_WH, key=lambda x: row[f'{x} МО среднее значение'], reverse=True)
+    # Составляем список наименования колонок МО Расчёт
     list_col = [wh + ' МО расчёт' for wh in list_wh_sorted]
-    # list_sales = [wh + ' продажи' for wh in list_wh_sorted]
-    # list_mo = [wh + ' МО' for wh in list_wh_sorted]
-    # print(list_col)
+
+    # Определяем количество для установки в каждом проходе.
+    # Определяем кол-во для установки за один проход
+    value_default = row['Кратность']
+    # Определяем кол-во проходов согласно расчётного значения по компании
+    count_pass = row['Розн. MaCar МО расчёт (окр.)'] / value_default
+    # Определяем кол-во возможных установок согласно значениям по каждому складу
+    count_set = 0
+    for i in list_col:
+        row[i + ' тех'] = 0
+        count_set += row[i] / value_default
+
+    # Приравниваем кол-во проходов к кол-во возможных установок, если кол-во возможных установок меньше
+    if count_pass > count_set:
+        print(f'{count_pass=}')
+        print(f'{count_set=}')
+        print(f'Уменьшаем количество проходов, т.к. кол-во для установки меньше '
+              f'количества проходов из-за округления в меньшую сторону')
+        count_pass = count_set
+
+    # Определяем наименование колонок для приоритетного склада в случае его использования
     prior_wh_mo, prior_wh_calc = None, None
     if PRIOR_WH:
         prior_wh_mo = PRIOR_WH + ' МО'
         prior_wh_calc = PRIOR_WH + ' МО расчёт'
 
+    # Если кол-во проходов равно 0, то устанавливаем 0,8 если не было продаж за 2 года.
+    # Если продажи за два года были, то пытаемся установить
     if row['Розн. MaCar МО расчёт (окр.)'] / value_default <= 0:
         if row['Розн. продажи MaCar за 2 года'] <= 0:
             for i in list_col:
@@ -695,6 +717,7 @@ def final_calc(row):
             if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
                 # Устанавливаем ... МО расчёт согласно приоритетного склада
                 row[prior_wh_calc] = set_value_mo_0_9(row[prior_wh_mo], value_default)
+                row[prior_wh_calc + ' тех'] += value_default
                 if i != prior_wh_calc:
                     if row[i] >= 1:
                         row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
@@ -713,29 +736,50 @@ def final_calc(row):
 
     elif row['Розн. MaCar МО расчёт (окр.)'] / value_default == 2:
 
-        if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9) and row[prior_wh_calc] == 0:
+        if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
             # Устанавливаем ... МО расчёт согласно приоритетного склада
 
             # Переставляем приоритетный склад вперёд списка и переворачиваем остальной список
             list_col1 = [prior_wh_calc] + [col for col in reversed(list_col) if col != prior_wh_calc]
-            # TODO Дальше код не смотрел, надо проверить. а что если обе продажи на одном складе?
+            list_col2 = list_col.copy()
             first_pass = True
             while count_pass > 0:
-                for i in list_col1:
-                    if row[i] >= 1 and row[i] > row[i + ' тех']:
-                        if first_pass:
-                            row[prior_wh_calc + ' тех'] += value_default
-                            first_pass = False
-                        else:
-                            row[i + ' тех'] += value_default
+                for i1 in list_col1:
+                    if row[i1] >= 1 and row[i1] > row[i1 + ' тех'] and count_pass > 0 and first_pass:
+                        row[prior_wh_calc + ' тех'] += value_default
+                        first_pass = False
                         count_pass -= 1
+                        list_col2.remove(i1)
+                        if i1 != prior_wh_calc:
+                            list_col2.remove(prior_wh_calc)
 
+                for i2 in list_col2:
+                    if row[i2] >= 1 and row[i2] > row[i2 + ' тех'] and count_pass > 0:
+                        row[i2 + ' тех'] += value_default
+                        count_pass -= 1
         else:
             while count_pass > 0:
+
                 for i in list_col:
-                    if row[i] >= 1 and row[i] > row[i + ' тех']:
+                    if row[i] >= 1 and row[i] > row[i + ' тех'] and count_pass > 0:
                         row[i + ' тех'] += value_default
                         count_pass -= 1
+
+        for i in list_col:
+            if (row[i] >= 1 or i == prior_wh_calc) and row[i + ' тех'] >= 1:
+                row[i] = set_value_mo_0_9(row[i[:-7]], row[i + ' тех'])
+            elif row[i] >= 1 and row[i + ' тех'] == 0:
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
+            elif row[i] == 0:
+                row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
+
+    # TODO Дальше код не смотрел, надо проверить
+    elif row['Розн. MaCar МО расчёт (окр.)'] / value_default > 2:
+        while count_pass > 0:
+            for i in list_col:
+                if row[i] >= 1 and row[i] > row[i + ' тех'] and count_pass > 0:
+                    row[i + ' тех'] += value_default
+                    count_pass -= 1
         for i in list_col:
             if row[i] >= 1 and row[i + ' тех'] >= 1:
                 row[i] = set_value_mo_0_9(row[i[:-7]], row[i + ' тех'])
@@ -743,31 +787,12 @@ def final_calc(row):
                 row[i] = set_value_mo_0_9(row[i[:-7]], 0.93)
             elif row[i] == 0:
                 row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
-
+    else:
+        print('Не попадает в условия простановки МО. Сообщите разработчику!!!')
+        print(row)
+    return row
 
     # TODO Дальше код не смотрел, надо проверить
-    elif row['Розн. MaCar МО расчёт (окр.)'] / value_default > 2:
-        pass
-    # TODO Дальше код не смотрел, надо проверить
-    elif 2 < row[f'Розн. продажи MaCar за {PERIOD_LONG}'] < VALUE_ALL_PRIOR_WH:
-        val_min_mo = row['Кратность']  # TODO Переделать если начнём использовать Комплектность
-        # В колонке с окончанием " тех" рассчитываем необходимо для установки МО
-        while count_pass > 0:
-            for i in list_col:
-                if row[i] > 0 and (row[i[:-7]] == 0 or row[i[:-7]] >= 0.9) and row[i + ' тех'] < row[i]:
-                    row[i + ' тех'] += val_min_mo
-                    # row[i] = set_value_mo_0_9(row[i[:-7]], 0.92)
-                    count_pass -= row['Кратность']
-                # row[i] = set_value_mo_0_9(row[i[:-7]], val_min_mo)
-            val_min_mo += row['Кратность']
-        for i in list_col:
-            row[i] = set_value_mo_0_9(row[i[:-7]], 0.92 if row[i] == 0 else row[i + ' тех'])
-
-    elif row[f'Розн. продажи MaCar за {PERIOD_LONG}'] >= VALUE_ALL_PRIOR_WH:
-        for i in list_col:
-            val_default = row[['Комплектность', 'Кратность']].max()
-            row[i] = set_value_mo_0_9(row[i[:-7]], val_default if row[i] == 0 else row[i])
-
     # Обнуляем расчётные значения оптового склада, если их не надо учитывать
     if not USE_OPT_STORE:
         row['05 Павловский МО расчёт'] = 0
@@ -1155,6 +1180,69 @@ def create_final_df(df1: pd.DataFrame, df2: pd.DataFrame, df3: pd.DataFrame, df4
     return df_final
 
 
+def sort_df_final(df):
+    """Сортируем столбцы в нужном порядке"""
+    """01 Кирова МО расчёт	01 Кирова МО расчёт тех	01 Кирова МО среднее значение"""
+    sort_list = ['Комплектность', 'Кратность',
+                 f'01 Кирова продажи за {PERIOD_LONG}', f'01 Кирова продажи за {PERIOD_SHOT}', '01 Кирова МО',
+                 f'01 Кирова МО расчёт за {PERIOD_LONG}', f'01 Кирова МО расчёт за {PERIOD_SHOT}',
+                 f'01 Кирова МО среднее значение', f'01 Кирова МО расчёт',
+                 f'02 Автолюбитель продажи за {PERIOD_LONG}', f'02 Автолюбитель продажи за {PERIOD_SHOT}',
+                 '02 Автолюбитель МО',
+                 f'02 Автолюбитель МО расчёт за {PERIOD_LONG}', f'02 Автолюбитель МО расчёт за {PERIOD_SHOT}',
+                 f'02 Автолюбитель МО среднее значение', f'02 Автолюбитель МО расчёт',
+                 f'03 Интер продажи за {PERIOD_LONG}', f'03 Интер продажи за {PERIOD_SHOT}', '03 Интер МО',
+                 f'03 Интер МО расчёт за {PERIOD_LONG}', f'03 Интер МО расчёт за {PERIOD_SHOT}',
+                 f'03 Интер МО среднее значение', f'03 Интер МО расчёт',
+                 f'04 Победа продажи за {PERIOD_LONG}', f'04 Победа продажи за {PERIOD_SHOT}', '04 Победа МО',
+                 f'04 Победа МО расчёт за {PERIOD_LONG}', f'04 Победа МО расчёт за {PERIOD_SHOT}',
+                 f'04 Победа МО среднее значение', f'04 Победа МО расчёт',
+                 f'08 Центр продажи за {PERIOD_LONG}', f'08 Центр продажи за {PERIOD_SHOT}', '08 Центр МО',
+                 f'08 Центр МО расчёт за {PERIOD_LONG}', f'08 Центр МО расчёт за {PERIOD_SHOT}',
+                 f'08 Центр МО среднее значение', f'08 Центр МО расчёт',
+                 f'09 Вокзалка продажи за {PERIOD_LONG}', f'09 Вокзалка продажи за {PERIOD_SHOT}', '09 Вокзалка МО',
+                 f'09 Вокзалка МО расчёт за {PERIOD_LONG}', f'09 Вокзалка МО расчёт за {PERIOD_SHOT}',
+                 f'09 Вокзалка МО среднее значение', f'09 Вокзалка МО расчёт',
+                 '05 Павловский МО',
+                 'Розн. продажи MaCar за 2 года',
+                 f'Розн. продажи MaCar за {PERIOD_LONG}', f'Розн. продажи MaCar за {PERIOD_SHOT}',
+                 f'Розн. MaCar МО расчёт за {PERIOD_LONG}', f'Розн. MaCar МО расчёт за {PERIOD_SHOT}',
+                 'Розн. MaCar МО среднее значение', 'Розн. MaCar МО расчёт (окр.)',
+                 'Компания MaCar МО', 'Компания MaCar МО техническое']
+    if USE_OPT_STORE:
+        sort_list = ['Комплектность', 'Кратность',
+                     f'01 Кирова продажи за {PERIOD_LONG}', f'01 Кирова продажи за {PERIOD_SHOT}', '01 Кирова МО',
+                     f'01 Кирова МО расчёт за {PERIOD_LONG}', f'01 Кирова МО расчёт за {PERIOD_SHOT}',
+                     f'01 Кирова МО среднее значение', f'01 Кирова МО расчёт',
+                     f'02 Автолюбитель продажи за {PERIOD_LONG}', f'02 Автолюбитель продажи за {PERIOD_SHOT}',
+                     '02 Автолюбитель МО',
+                     f'02 Автолюбитель МО расчёт за {PERIOD_LONG}', f'02 Автолюбитель МО расчёт за {PERIOD_SHOT}',
+                     f'02 Автолюбитель МО среднее значение', f'02 Автолюбитель МО расчёт',
+                     f'03 Интер продажи за {PERIOD_LONG}', f'03 Интер продажи за {PERIOD_SHOT}', '03 Интер МО',
+                     f'03 Интер МО расчёт за {PERIOD_LONG}', f'03 Интер МО расчёт за {PERIOD_SHOT}',
+                     f'03 Интер МО среднее значение', f'03 Интер МО расчёт',
+                     f'04 Победа продажи за {PERIOD_LONG}', f'04 Победа продажи за {PERIOD_SHOT}', '04 Победа МО',
+                     f'04 Победа МО расчёт за {PERIOD_LONG}', f'04 Победа МО расчёт за {PERIOD_SHOT}',
+                     f'04 Победа МО среднее значение', f'04 Победа МО расчёт',
+                     f'08 Центр продажи за {PERIOD_LONG}', f'08 Центр продажи за {PERIOD_SHOT}', '08 Центр МО',
+                     f'08 Центр МО расчёт за {PERIOD_LONG}', f'08 Центр МО расчёт за {PERIOD_SHOT}',
+                     f'08 Центр МО среднее значение', f'08 Центр МО расчёт',
+                     f'09 Вокзалка продажи за {PERIOD_LONG}', f'09 Вокзалка продажи за {PERIOD_SHOT}', '09 Вокзалка МО',
+                     f'09 Вокзалка МО расчёт за {PERIOD_LONG}', f'09 Вокзалка МО расчёт за {PERIOD_SHOT}',
+                     f'09 Вокзалка МО среднее значение', f'09 Вокзалка МО расчёт',
+                     f'05 Павловский продажи за {PERIOD_LONG}', f'05 Павловский продажи за {PERIOD_LONG}',
+                     '05 Павловский МО',
+                     f'05 Павловский МО расчёт за {PERIOD_LONG}', f'05 Павловский МО расчёт за {PERIOD_SHOT}',
+                     f'05 Павловский МО среднее значение', f'05 Павловский МО расчёт',
+                     'Розн. продажи MaCar за 2 года',
+                     f'Розн. продажи MaCar за {PERIOD_LONG}', f'Розн. продажи MaCar за {PERIOD_SHOT}',
+                     f'Розн. MaCar МО расчёт за {PERIOD_LONG}', f'Розн. MaCar МО расчёт за {PERIOD_SHOT}',
+                     'Розн. MaCar МО среднее значение', 'Розн. MaCar МО расчёт (окр.)',
+                     'Компания MaCar МО', 'Компания MaCar МО техническое']
+    df = df[sort_list]
+    return df
+
+
 def run():
     sales_filelist = search_file(salesName)  # Запускаем метод по поиску файлов и получаем список файлов
     minstock_filelist = search_file(minStockName)  # Запускаем метод по поиску файлов и получаем список файлов
@@ -1166,31 +1254,42 @@ def run():
     # Создаём DataFrame с продажами за 2 года
     df_sales_two_year = create_df(sales_filelist_two_year, salesName)
     # Суммируем продажи за 2 года
+    print(f'Суммируем продажи за 2 года...')
     df_sales_two_year = sum_retail_sales(df_sales_two_year, name='Розн. продажи MaCar за 2 года')
     df_sales_two_year = df_sales_two_year['Розн. продажи MaCar за 2 года']
 
     # Создаём DataFrame с продажами за длинный период
     df_sales_one_year = create_df(sales_filelist_one_year, salesName)
     # Рассчитываем значения МО расчет с учётом Кратности и Комплектности
+    print(f'Рассчитываем значения МО расчет с учётом Кратности и Комплектности за {PERIOD_LONG}...')
     df_sales_one_year = payment(df_sales_one_year, PERIOD_LONG)
 
     # Создаём DataFrame с продажами за короткий период
     df_sales_three_month = create_df(sales_filelist_three_month, salesName)
     # Рассчитываем значения МО расчет с учётом Кратности и Комплектности
+    print(f'Рассчитываем значения МО расчет с учётом Кратности и Комплектности за {PERIOD_SHOT}...')
     df_sales_three_month = payment(df_sales_three_month, PERIOD_SHOT)
 
     # Создаём DataFrame с минимальными остатками
+    print('Создаём DataFrame с минимальными остатками...')
     df_minstock = create_df(minstock_filelist, minStockName)
 
     # Объединяем полученные данные в единый DataFrame
+    print('Объединяем полученные данные в единый DataFrame...')
     df_final = create_final_df(df_minstock, df_sales_one_year, df_sales_two_year, df_sales_three_month)
 
     # Рассчитываем итоговые значения по компании
+    print('Рассчитываем итоговые значения по компании...')
     df_final = df_final.apply(total_value_calc, axis=1)
 
     # Осуществляем последние расчёты по каждой строке
-    # df_final = df_final.apply(final_calc, axis=1)
+    print('Осуществляем последние расчёты по каждой строке...')
+    df_final = df_final.apply(final_calc, axis=1)
     df_final.to_excel('test_final.xlsx')
+    # Сортируем столбцы
+    print('Сортируем столбцы...')
+    df_final = sort_df_final(df_final)
+    df_final.to_excel('final.xlsx')
     return
 
     # Сохраняем конечный результат в эксель
