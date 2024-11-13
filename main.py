@@ -80,9 +80,9 @@ def input_max_crat_comp():
             result = int(input('Введите вариант: '))
         if result == 1:
             print('Вы выбрали режим установки кратности программой.')
-            global CONST_CRAT
+            # global CONST_CRAT
             const_crat = int(input('Введите значение Кратности: '))
-            crat = const_crat
+            # crat = const_crat
         elif result == 2:
             crat = int(input('Введите максимальное значение Кратности: '))
             comp = int(input('Введите максимальное значение Комплектности: '))
@@ -283,9 +283,9 @@ def read_excel(file_name):
     print('Попытка загрузки файла:' + file_name)
     try:
         if 'продажи' in file_name:
-            df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+            df = pd.read_excel(file_name, header=None, skipfooter=1, engine='openpyxl')
         else:
-            df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=0, engine='openpyxl')
+            df = pd.read_excel(file_name, header=None, skipfooter=0, engine='openpyxl')
         return df
     except KeyError as Error:
         print(Error)
@@ -294,9 +294,9 @@ def read_excel(file_name):
             bug_fix(file_name)
             print('Исправлена ошибка: ', Error, f'в файле: \"{file_name}\"\n')
             if 'продажи' in file_name:
-                df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=1, engine='openpyxl')
+                df = pd.read_excel(file_name, header=None, skipfooter=1, engine='openpyxl')
             else:
-                df = pd.read_excel(file_name, sheet_name='TDSheet', header=None, skipfooter=0, engine='openpyxl')
+                df = pd.read_excel(file_name, header=None, skipfooter=0, engine='openpyxl')
             return df
         else:
             print('Ошибка: >>' + str(Error) + '<<')
@@ -449,10 +449,7 @@ def set_comp_crat() -> pd.DataFrame:
 
     file = search_file('Комплектность, Кратность.xlsx')
     df_temp = create_df(file)
-    # df_temp[['Комплектность', 'Кратность']] = df_temp[['Комплектность', 'Кратность']].fillna(1)
     df_temp = df_temp.fillna(1)
-    # df_temp['Комплектность'] = df_temp['Комплектность'].fillna(1)
-    # df_temp['Кратность'] = df_temp['Кратность'].fillna(1)
 
     if CONST_CRAT:
         print(f'Устанавливаем значение кратности равное {CONST_CRAT}')
@@ -460,6 +457,7 @@ def set_comp_crat() -> pd.DataFrame:
     else:
         # Ограничивает значение Кратности и Комплектности введённым пользователем максимальным значением
         df_temp['Кратность'][df_temp['Кратность'] >= MAX_CRAT] = MAX_CRAT
+
     df_temp['Комплектность'][df_temp['Комплектность'] >= MAX_COMP] = MAX_COMP
     return df_temp
 
