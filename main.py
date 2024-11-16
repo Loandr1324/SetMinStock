@@ -9,6 +9,8 @@ minStockName = 'МО'
 DF_COMP_CRAT = pd.DataFrame()
 PERIOD_LONG = '1 год'
 PERIOD_SHOT = '3 мес'
+DEFAULT_COLUMNS_NAMES: list = ['01 Кирова', '02 Автолюбитель', '03 Интер', '04 Победа', '08 Центр', '09 Вокзалка']
+VALUE_MO_SKIP = [0.24, 0.25, 0.26, 0.27, 0.28, 0.29]
 
 
 def input_list_wh():
@@ -35,6 +37,33 @@ def input_list_wh():
         print(f'Порядок складов изменён: {list_wh}')
     except (ValueError, KeyError):
         print(f'Ошибка при вводе складов!!! Порядок складов установлен по умолчанию: {list_wh}')
+
+    return list_wh
+
+
+def input_wh_skip_list():
+    """Запрашиваем список складов, которые необходимо пропускать при анализе"""
+    dict_list_wh = {
+        1: '01 Кирова',
+        2: '02 Автолюбитель',
+        3: '03 Интер',
+        4: '04 Победа',
+        8: '08 Центр',
+        9: '09 Вокзалка'
+    }
+    list_wh = [value for value in dict_list_wh.values()]
+    print('Введите список складов, которые надо исключить из анализа и не менять на нём МО.')
+    print(f'По умолчанию список складов пуст, но Вы можете добавить любой из списка: {list_wh}.')
+    print('Выбор можно сделать, вводя через запятую номера складов. Например: 1, 4')
+    list_key = input('Если никакие склады исключать не нужно, то нажмите Enter:')
+    try:
+        list_key = list_key.split(',')
+        # Проверяем что введены все номера складов, все номера разные и все номера есть в словаре
+        list_wh = [dict_list_wh[int(k)] for k in list_key]
+        print(f'Данные склады будут исключены из списка: {list_wh}')
+    except (ValueError, KeyError):
+        print(f'Ошибка при вводе складов!!! Никакие склады исключаться не будут: {list_wh}')
+        list_wh = []
 
     return list_wh
 
@@ -155,6 +184,7 @@ def input_day_opt_stock():
         # Получаем наименование колонки на основании которой будет производиться расчёт
         name_columns = input_name_period_opt_stock()
         try:
+            print()
             print('Введите минимальную сумму расчётных значений продаж при котором необходимо держать '
                   'дополнительный запас на оптовом складе: ')
             min_value_opt_stock = int(input(f'По умолчанию используется ({min_value_opt_stock}):'))
@@ -165,6 +195,7 @@ def input_day_opt_stock():
             print(f'Используем значение по умолчанию: {min_value_opt_stock}')
 
         try:
+            print()
             day_opt_stock = int(input('Введите кол-во дней запаса для оптового склада: '))
             if day_opt_stock < DAY_STOCK:
                 print('Кол-во дней запаса оптового склада не может быть меньше кол-ва дней запаса розничного склада. '
@@ -688,7 +719,21 @@ def final_calc(row):
     # Сортируем список складов согласно их среднего значения
     list_wh_sorted = sorted(LIST_WH, key=lambda x: row[f'{x} МО среднее значение'], reverse=True)
     # Составляем список наименования колонок МО Расчёт
-    list_col = [wh + ' МО расчёт' for wh in list_wh_sorted]
+    # list_col = [wh + ' МО расчёт' for wh in list_wh_sorted if wh not in WH_SKIP_LIST]
+    # list_mo = [wh + ' МО' for wh in LIST_WH]
+
+    prior_wh = PRIOR_WH
+    list_col = []
+    skip_list_col = []
+    for wh in list_wh_sorted:
+        not_skip_mo = round(row[wh + ' МО'] - int(row[wh + ' МО']), 2) not in VALUE_MO_SKIP
+        not_skip_wh = wh not in WH_SKIP_LIST
+        if not_skip_mo and not_skip_wh:
+            list_col += [wh + ' МО расчёт']
+        else:
+            skip_list_col += [wh]
+            row[wh + ' МО расчёт'] = row[wh + ' МО']
+
     # Определяем переменную для списка складов с установленными первыми значениями
     list_col_set = []
 
@@ -704,7 +749,7 @@ def final_calc(row):
     count_pass_crat = int((row['Розн. MaCar МО расчёт (окр.)'] % value_default) / val_def_crat)
 
     if count_pass > len(list_col):
-        count_pass  = len(list_col)
+        count_pass = len(list_col)
         count_pass_crat = (row['Розн. MaCar МО расчёт (окр.)'] - count_pass * value_default) / val_def_crat
 
     # Определяем кол-во возможных установок согласно значениям по каждому складу
@@ -724,9 +769,11 @@ def final_calc(row):
 
     # Определяем наименование колонок для приоритетного склада в случае его использования
     prior_wh_mo, prior_wh_calc = None, None
-    if PRIOR_WH:
-        prior_wh_mo = PRIOR_WH + ' МО'
-        prior_wh_calc = PRIOR_WH + ' МО расчёт'
+    if prior_wh and prior_wh not in skip_list_col:
+        prior_wh_mo = prior_wh + ' МО'
+        prior_wh_calc = prior_wh + ' МО расчёт'
+    else:
+        prior_wh = False
 
     # Если кол-во проходов равно 0, то устанавливаем 0,8 если не было продаж за 2 года.
     # Если продажи за два года были, то пытаемся установить value_default только складах, где МО >= 1, но не более 2-х
@@ -739,7 +786,7 @@ def final_calc(row):
             count_pass = min(sum(row[i[:-7]] >= 1 for i in list_col), 2)
 
             # if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 1: # Если надо устанавливать МО даже при 0
-            if PRIOR_WH and row[prior_wh_mo] >= 1:
+            if prior_wh and row[prior_wh_mo] >= 1:
                 # Устанавливаем ... МО расчёт согласно приоритетного склада.
                 # Переставляем приоритетный склад вперёд списка и переворачиваем остальной список
                 list_col1 = [prior_wh_calc] + [col for col in reversed(list_col) if col != prior_wh_calc]
@@ -777,7 +824,7 @@ def final_calc(row):
     elif count_pass == 1:
         for i in list_col:
             while count_pass > 0:
-                if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
+                if prior_wh and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
                     # Устанавливаем ... МО расчёт согласно приоритетного склада
                     row[prior_wh_calc + ' тех'] += value_default
                     list_col_set += [prior_wh_calc]
@@ -800,7 +847,7 @@ def final_calc(row):
     # Если приоритетного склада нет, то устанавливаем согласно расчётному значению
     elif count_pass == 2:
 
-        if PRIOR_WH and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
+        if prior_wh and (row[prior_wh_mo] == 0 or row[prior_wh_mo] >= 0.9):
             # Устанавливаем ... МО расчёт согласно приоритетного склада.
             # Переставляем приоритетный склад вперёд списка и переворачиваем остальной список
             list_col1 = [prior_wh_calc] + [col for col in reversed(list_col) if col != prior_wh_calc]
@@ -1014,13 +1061,18 @@ def total_value_calc(row: pd.Series) -> pd.Series:
 
     # Суммируем значения продаж за длинный и короткий периоды
     for key, item in enumerate(list_mo_retail):
-        if (row[item] == 0) or (row[item] >= 0.9):
+        not_skip_mo = round(row[item] - int(row[item]), 2) not in VALUE_MO_SKIP
+        not_skip_wh = LIST_WH[key] not in WH_SKIP_LIST
+        # Суммируем, если 0 < МО <= 0.9, значение МО после запятой не надо пропускать и склад так же не надо пропускать
+        if (row[item] == 0) or (row[item] >= 0.9) and not_skip_mo and not_skip_wh:
             row[f'Розн. продажи MaCar за {PERIOD_LONG}'] += row[list_sales_long[key]]
             row[f'Розн. продажи MaCar за {PERIOD_SHOT}'] += row[list_sales_shot[key]]
 
     # Рассчитываем среднее значение по каждому складу
     for key, item in enumerate(list_mo):
-        if (row[item] == 0) or (row[item] >= 0.9):
+        not_skip_mo = round(row[item] - int(row[item]), 2) not in VALUE_MO_SKIP
+        not_skip_wh = LIST_WH[key] not in WH_SKIP_LIST
+        if (row[item] == 0) or (row[item] >= 0.9) and not_skip_mo and not_skip_wh:
             row[list_calc_merge[key]] = \
                 (row[list_calc_long[key]] + row[list_calc_shot[key]]) / 2
         else:
@@ -1219,17 +1271,27 @@ def run():
 
 if __name__ == '__main__':
     LIST_WH = input_list_wh()  # Запрашиваем список складов
+    print()
+    WH_SKIP_LIST = input_wh_skip_list()  # Запрашиваем список не учитываемых складов
+    print()
     MAX_CRAT, MAX_COMP, CONST_CRAT = input_max_crat_comp()  # Задаём максимальное значение Кратности и Комплектности
+    print()
     PRIOR_WH = input_prior_wh()  # Задаём приоритетный склад
+    print()
     # Задаём кол-во дней для расчётов Розничных складов за длинный период
     YEAR_DAY_SALES = input_day_sales(365, PERIOD_LONG)
+    print()
     # Задаём кол-во дней для расчётов Розничных складов за короткий период
     MONTH_DAY_SALES = input_day_sales(91, PERIOD_SHOT)
+    print()
     # Задаём кол-во дней запаса
     DAY_STOCK = input_day_stock()
+    print()
     USE_OPT_STORE = input_use_opt_store()  # Задаём учёт продаж оптового склада для установки МО
+    print()
     # Задаём кол-во дней запаса для оптового склада и минимальная сумма расчётных значений розничных складов
     DAY_OPT_STOCK, MIN_VALUE_ADD_OPT_SALES, ADD_NAME_PERIOD_OPT_STOCK = input_day_opt_stock()
+    print()
 
     # Задаём значение продаж для применения всех приоритетных складов
     # VALUE_ALL_PRIOR_WH = input_value_all_prior_wh() TODO Пока решили не использовать
