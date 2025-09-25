@@ -235,7 +235,7 @@ def search_file(name):
     for item in os.listdir(FOLDER):
         condition_opt = True
         if not USE_OPT_STORE and name == 'продажи':
-            keywords = ['техснаб', 'новотрейд', 'тс', 'нт']
+            keywords = ['техснаб', 'новотрейд']
             condition_opt = not any(keyword in item.lower() for keyword in keywords)
         # если файл содержит name и с расширением .xlsx, то выполняем
         if name in item and item.endswith('.xlsx') and condition_opt:
