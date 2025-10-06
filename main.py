@@ -1071,7 +1071,21 @@ def total_value_calc(row: pd.Series) -> pd.Series:
     # Рассчитываем среднее значение по каждому складу
     for key, item in enumerate(list_mo):
         not_skip_mo = round(row[item] - int(row[item]), 2) not in VALUE_MO_SKIP
+
+        # Проверяем, что key в пределах LIST_WH
+        """
+        Когда учитываются продажи Оптового склада то он есть в списке list_mo, но его нет в списке LIST_WH.
+        Чтобы не менять список LIST_WH при работе с Оптовым складом, просто возвращаем по последнему значению True,
+        т.к. оно не может быть в списке исключённых
+        
+        Старая строка кода
         not_skip_wh = LIST_WH[key] not in WH_SKIP_LIST
+        """
+        if key >= len(LIST_WH):
+            not_skip_wh = True  # или break, если нужно прервать выполнение
+        else:
+            not_skip_wh = LIST_WH[key] not in WH_SKIP_LIST
+
         if (row[item] == 0) or (row[item] >= 0.9) and not_skip_mo and not_skip_wh:
             row[list_calc_merge[key]] = \
                 (row[list_calc_long[key]] + row[list_calc_shot[key]]) / 2
