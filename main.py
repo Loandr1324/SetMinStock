@@ -1050,7 +1050,7 @@ def total_value_calc(row: pd.Series) -> pd.Series:
         list_calc_merge.append(f'05 Павловский МО среднее значение')
         list_calc.append('05 Павловский МО расчёт')
 
-    # Суммируем данные из колонок list_sales... в отдельные колонку, если МО == 0 или МО >= 0.9
+    # Суммируем данные из колонок list_sales... в отдельные колонки, если МО == 0 или МО >= 0.9
     row[f'Розн. продажи MaCar за {PERIOD_LONG}'] = 0
     row[f'Розн. продажи MaCar за {PERIOD_SHOT}'] = 0
     row[f'Розн. MaCar МО расчёт за {PERIOD_LONG}'] = 0
@@ -1064,7 +1064,7 @@ def total_value_calc(row: pd.Series) -> pd.Series:
         not_skip_mo = round(row[item] - int(row[item]), 2) not in VALUE_MO_SKIP
         not_skip_wh = LIST_WH[key] not in WH_SKIP_LIST
         # Суммируем, если 0 < МО <= 0.9, значение МО после запятой не надо пропускать и склад так же не надо пропускать
-        if (row[item] == 0) or (row[item] >= 0.9) and not_skip_mo and not_skip_wh:
+        if (row[item] == 0) or (row[item] >= 0.9):  # and not_skip_mo and not_skip_wh:
             row[f'Розн. продажи MaCar за {PERIOD_LONG}'] += row[list_sales_long[key]]
             row[f'Розн. продажи MaCar за {PERIOD_SHOT}'] += row[list_sales_shot[key]]
 
