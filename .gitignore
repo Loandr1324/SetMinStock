@@ -1,0 +1,42 @@
+# Виртуальное окружение
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+
+# Артефакты сборки PyInstaller
+build/
+dist/
+*.spec.bak
+
+# Исполняемые файлы (сборки)
+*.exe
+!build5.bat
+
+# Рабочие данные и результаты (пользовательские данные)
+*Исходные данные*/
+Архив/
+Анализ МО по компании.xlsx
+_Анализ МО по компании.xlsx
+df_comp_crat.xlsx
+df_final*.xlsx
+final.xlsx
+temp*.xlsx
+correct_file*
+build5.bat
+AGENTS.md
+main.spec
+CONTEX.md
+Расчет_минимальных_остатков_по_компании_инструкция.doc
+Cоздание_Инструкций_правила_V-07.02.2020.doc
+
+# Инструменты Kilo (локальные worktree-сессии)
+.kilo/
